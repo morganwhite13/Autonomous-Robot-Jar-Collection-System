@@ -24,32 +24,15 @@ An advanced autonomous mobile robot simulation built in **Webots** that navigate
 - [What I Learned](#-what-i-learned)
 - [Future Improvements](#-future-improvements)
 - [Project Structure](#-project-structure)
-- [Support & Questions](#-support--questions)
-- [Contributing](#-contributing)
-- [License](#-license)
 - [Acknowledgments](#-acknowledgments)
 
-
-
-
-
-
 ---
-
-## 📺 Video Demo
 
 ## 📺 Video Demos
 
 - **[Main Robot Demo](https://www.youtube.com/watch?v=kO9e8dzjCfg)** - Full autonomous mission with robot collecting jars
 - **[Top-Down Overview](https://www.youtube.com/watch?v=dIo8oXvvNeM)** - Aerial view of warehouse navigation and collection
 - **[Robot Camera Feed](https://www.youtube.com/watch?v=sPnMvLkUqaw)** - Real-time vision processing and object detection
-
-
-[Main Robot Demo](www.youtube.com/watch?v=kO9e8dzjCfg)
-Top-Down Overview
-<iframe width="100%" height="450" src="https://www.youtube.com/embed/dIo8oXvvNeM" title="Top Down Robot Project Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-Robot Camera Feed
-<iframe width="100%" height="450" src="https://www.youtube.com/embed/sPnMvLkUqaw" title="Robot Camera Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ---
 
