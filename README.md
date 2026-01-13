@@ -30,7 +30,7 @@ An advanced autonomous mobile robot simulation built in **Webots** that navigate
 ## 📺 Video Demo
 
 Main Robot Demo
-<iframe width="100%" height="450" src="https://www.youtube.com/embed/kO9e8dzjCfg" title="Robot Project Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+[![Main Robot Demo](img.youtube.com)](www.youtube.com/watch?v=kO9e8dzjCfg)
 Top-Down Overview
 <iframe width="100%" height="450" src="https://www.youtube.com/embed/dIo8oXvvNeM" title="Top Down Robot Project Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 Robot Camera Feed
