@@ -4,7 +4,6 @@ An advanced autonomous mobile robot simulation built in **Webots** that navigate
 
 **Tech Stack:** Webots R2025a, Java, Computer Vision, Robotics  
 **Status:** ✅ Complete and Operational  
-**GitHub:** [View Source Code](https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System)
 
 ---
 
@@ -569,45 +568,6 @@ private static void makeHardcodedTurn(double x1, double y1,
    - Program exits when all 5 jars are collected
    - Final message: `=== ALL JARS COLLECTED! ===`
 
-### Customization Options
-
-**Modify Robot Behavior:**
-```java
-// In ProjectController3.java
-
-// Adjust search speed
-private static double MAX_SPEED = 5; // m/s (default: 5)
-
-// Change jar count target
-static int jarsToGo = 5; // (default: 5)
-
-// Modify approach speed
-double approachSpeed = MAX_SPEED / 8; // (default: 1/8)
-
-// Adjust green detection thresholds
-int green_maximum = 120;  // R channel max (default: 120)
-int green_minimum = 35;   // G channel min (default: 35)
-```
-
-**Add Custom Waypoints:**
-```java
-ArrayList<Point> customPath = new ArrayList<>();
-customPath.add(new Point(850, 100));
-customPath.add(new Point(700, 200));
-customPath.add(new Point(500, 150));
-// ... add more waypoints
-executeHardcodedPath(customPath, timeStep);
-```
-
-**Adjust Gripper Parameters:**
-```java
-// Modify grip strength
-openCloseGripper(0.05f);  // Range: 0.001 to 0.099
-
-// Modify lift height
-liftLowerGripper(-0.02f);  // Negative = lift, positive = lower
-```
-
 ---
 
 ## 🎓 What I Learned
@@ -674,51 +634,6 @@ If I were to extend this project, I would prioritize:
 10. **Force Feedback Gripper** - Implement pressure sensing for delicate object handling
 11. **Behavior Trees** - More sophisticated state management for complex tasks
 12. **ROS 2 Integration** - Enable compatibility with broader robotics ecosystem
-
----
-
-## 📁 Project Structure
-
-```
-autonomous-warehouse-robot/
-├── README.md                    # This file
-├── LICENSE                      # MIT License
-├── CONTRIBUTING.md              # Contribution guidelines
-├── .gitignore                   # Git ignore rules
-│
-├── simulation/
-│   ├── ProjectWorld2025.wbt     # Webots world file (main entry point)
-│   ├── protos/
-│   │   ├── Pioneer3Gripper.proto    # Gripper component definition
-│   │   └── Pioneer3dx.proto         # Robot base definition
-│   └── appearances/
-│       └── Parquetry.proto      # Warehouse floor texture
-│
-├── src/
-│   └── ProjectController3.java  # Main robot controller (800+ lines)
-│
-├── compiled/
-│   └── ProjectController3.class # Compiled Java bytecode
-│
-├── docs/
-│   ├── ALGORITHM_EXPLANATION.md # Detailed algorithm documentation
-│   ├── SENSOR_GUIDE.md          # Sensor specifications & usage
-│   ├── API_REFERENCE.md         # Webots API reference guide
-│   ├── TROUBLESHOOTING.md       # Common issues & solutions
-│   └── ARCHITECTURE.md          # System architecture details
-│
-├── images/
-│   ├── robot_overview.png       # Robot visualization
-│   ├── warehouse_layout.png     # Warehouse diagram
-│   ├── vision_example.png       # Camera vision samples
-│   ├── gripper_closeup.png      # Gripper mechanism
-│   └── detection_zones.png      # Vision detection zones
-│
-└── examples/
-    ├── simple_navigation.java   # Basic movement example
-    ├── color_detection.java     # Vision processing example
-    └── gripper_control.java     # Manipulation example
-```
 
 ---
 
