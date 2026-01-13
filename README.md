@@ -4,8 +4,8 @@ An advanced autonomous mobile robot simulation built in **Webots** that navigate
 
 **Tech Stack:** Webots R2025a, Java, Computer Vision, Robotics  
 **Status:** ✅ Complete and Operational  
-**GitHub:** [View Source Code](https://github.com/morganwhite13/autonomous-warehouse-robot)
-FIXXXXX
+**GitHub:** [View Source Code](https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System)
+
 ---
 
 ## 📋 Table of Contents
@@ -29,8 +29,9 @@ FIXXXXX
 
 ## 📺 Video Demo
 
-<!-- Uncomment and add your actual video URL -->
-<!-- <iframe width="100%" height="450" src="https://www.youtube.com/embed/YOUR_VIDEO_ID" title="Robot Project Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
+<iframe width="100%" height="450" src="https://www.youtube.com/embed/kO9e8dzjCfg" title="Robot Project Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="100%" height="450" src="https://www.youtube.com/embed/dIo8oXvvNeM" title="Top Down Robot Project Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="100%" height="450" src="https://www.youtube.com/embed/sPnMvLkUqaw" title="Robot Camera Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 *[Link to demo videos will be added here]*
 
