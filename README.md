@@ -675,3 +675,7 @@ If I were to extend this project, I would prioritize:
 *Last Updated: January 2026*  
 *Webots Version: R2025a*  
 *Java Version: JDK 11+*
+
+- [**Portfolio**](https://morganwhite13.github.io/)
+- [**Email**](morgan13white@icloud.com)
+- [**LinkedIn**](https://www.linkedin.com/in/morgan-white-95b245237/)
