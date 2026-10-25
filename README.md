@@ -85,7 +85,7 @@ Design and implement a fully autonomous robot system that can:
 ### Software Architecture
 
 ```
-ProjectController3.java (800+ lines)
+ProjectController3.java (about 760 lines)
 ├── Initialization Phase
 │   ├── Motor setup (wheels, gripper)
 │   ├── Sensor configuration (camera, compass, distance)
@@ -421,7 +421,7 @@ if (totalGreen < 15) {
 ### Main Components
 
 ```
-ProjectController3.java (800+ lines)
+ProjectController3.java (about 760 lines)
 ├── Initialization
 │   ├── Motor setup (wheels, gripper)
 │   ├── Sensor setup (camera, compass, distance)
@@ -599,7 +599,7 @@ This project taught me fundamental concepts across multiple disciplines:
 - Root cause analysis for mission failures
 
 ### Software Engineering
-- Large codebase organization (800+ line single file)
+- Large codebase organization (about 760-line single file)
 - API design and hardware abstraction
 - State machine implementation
 - Performance optimization techniques
@@ -657,11 +657,10 @@ If I were to extend this project, I would prioritize:
 ## 📈 Technical Metrics
 
 **Code Statistics:**
-- **Total Lines of Code**: 800+
-- **Methods**: 25+
+- **Total Lines of Code**: about 760
+- **Methods**: 22
 - **Classes**: 1 main class + 1 inner data class
 - **Complexity**: Moderate (straightforward logic, clear flow)
-- **Test Coverage**: 100% of core mission paths
 
 **Performance Metrics:**
 - **Control Loop Frequency**: 30-31 Hz
