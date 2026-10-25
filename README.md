@@ -57,7 +57,9 @@ Design and implement a fully autonomous robot system that can:
 - Manipulate objects with a gripper system
 - Return collected items to a designated drop-off zone
 - Repeat this process for multiple objects
-- Operate without GPS, pre-mapped routes, or external guidance systems
+- Operate without human intervention once the simulation starts
+
+**How it actually navigates:** jar detection uses the onboard camera and touch sensor, but navigation between areas uses hand-tuned waypoint routes. The controller runs as a Webots Supervisor (`supervisor TRUE` in the world file) and reads the robot's exact position from the simulator (`robot.getSelf().getField("translation")`), combined with the compass heading, to follow those routes.
 
 ---
 
@@ -72,10 +74,10 @@ Design and implement a fully autonomous robot system that can:
 
 **Sensing Suite:**
 - 📷 **Camera**: 64×64 RGB with color-based object detection
-- 📡 **Distance Sensors**: 6× ultrasonic sensors (SO0, SO1, SO3, SO4, SO6, SO7)
+- 📡 **Distance Sensors**: 6× ultrasonic sensors (SO0, SO1, SO3, SO4, SO6, SO7), enabled but only printed in a startup debug check, not used for control
 - 🧭 **Compass**: 3-axis heading sensor (±3° accuracy)
 - 🔲 **Touch Sensor**: Precise object contact detection
-- ⚡ **Accelerometer**: Stability monitoring
+- 🛰️ **Supervisor position**: Exact robot position read from the simulator (used for waypoint navigation)
 
 **Manipulation System:**
 - 🎮 **Lift Motor**: Vertical gripper movement
@@ -85,7 +87,7 @@ Design and implement a fully autonomous robot system that can:
 ### Software Architecture
 
 ```
-ProjectController3.java (800+ lines)
+ProjectController3.java (about 760 lines)
 ├── Initialization Phase
 │   ├── Motor setup (wheels, gripper)
 │   ├── Sensor configuration (camera, compass, distance)
@@ -188,7 +190,7 @@ Used for navigation guidance during return phase
 4. Check touch sensor every iteration
 5. If touch detected → Execute gripper sequence
 6. Track steps without green → Abort after 30 steps
-7. Maximum approach time: 400 steps (safety timeout)
+7. Maximum approach time: 300 steps (safety timeout)
 ```
 
 **Phase 4: Grab Verification**
@@ -260,9 +262,9 @@ Multi-layered detection prevents false positives and ensures robust operation:
 |--------|---------|-------------|
 | **Vision** | Object detection | Identifies jar location and direction |
 | **Compass** | Orientation tracking | Validates proper heading during navigation |
-| **Distance Sensors** | Obstacle detection | Prevents collisions with walls and boxes |
+| **Supervisor Position** | Localization | Exact simulator position used to follow waypoint routes |
+| **Distance Sensors** | Debug output only | Enabled and printed at startup; not used in control decisions |
 | **Touch Sensor** | Contact confirmation | Verifies object proximity before gripper engagement |
-| **Accelerometer** | Stability monitoring | Detects unusual movement patterns |
 
 ---
 
@@ -272,12 +274,12 @@ Multi-layered detection prevents false positives and ensures robust operation:
 ✅ **Precision Navigation** - Turn accuracy within ±3°, distance accuracy within ±10cm  
 ✅ **Intelligent Search** - 360° rotation scanning with best-match selection algorithm  
 ✅ **Gripper Synchronization** - Timed sequences (100+ iterations) ensure proper grip establishment  
-✅ **Sensor Fusion** - Combines 6 distance sensors, camera, compass, and touch for redundant perception  
+✅ **Sensor Fusion** - Combines camera, touch sensor, compass, and supervisor position  
 ✅ **Real-Time Control** - 30-31 Hz control cycle with 64 fps camera processing  
-✅ **Obstacle Avoidance** - 6 distance sensors prevent collisions throughout mission  
+✅ **Pre-Planned Routes** - Hand-tuned waypoint paths steer around known obstacles (the distance sensors are not used for avoidance)  
 ✅ **State Management** - Clean separation between clearing, collection, navigation, and placement phases  
 ✅ **Scalability** - System design supports 5+ jars (easily configurable)  
-✅ **Coordinate Space Handling** - Centimeter-scale integer math eliminates floating-point errors  
+✅ **Coordinate Space Handling** - Positions scaled to centimeters (×100) so waypoints can be stored as integer `Point`s  
 
 ---
 
@@ -329,10 +331,10 @@ if (score > bestScore) {
 
 ### Challenge 2: Navigation Precision in Large Arena
 
-**Problem:** Hardcoded waypoints required sub-decimeter accuracy in a large 20m × 20m arena. Floating-point coordinate systems introduced rounding errors.
+**Problem:** Hardcoded waypoints required sub-decimeter accuracy in a large 20m × 20m arena.
 
 **Solution:** 
-- Convert all coordinates to centimeter units (×100) for integer-based comparisons
+- Convert coordinates to centimeter units (×100); waypoints are stored as integer `Point`s, while distance checks use `double` maths
 - Real-time position monitoring from Supervisor API
 - Early termination when distance threshold reached
 - Compass-based turn validation with dynamic correction
@@ -377,15 +379,16 @@ for (int i = 0; i < 100; i++) {
 
 ### Challenge 4: Large Coordinate Space Management
 
-**Problem:** 20m × 20m arena with floating-point precision issues could cause navigation drift and rounding errors accumulating over long paths.
+**Problem:** Waypoints for a 20m × 20m arena needed a compact, readable representation.
 
-**Solution:** Store all internal coordinates in centimeters (integer-scale):
+**Solution:** Express coordinates in centimeters:
 - Position: 2000cm × 2000cm (instead of 20m × 20m)
-- Waypoints: Integer-based ArrayList<Point>
-- Distance calculations: Integer arithmetic until final comparison
+- Supervisor positions are scaled by 100 and kept as `double`; they are cast to `int` only when stored in a `Point`
+- Waypoints: ArrayList<Point> with integer centimeter coordinates
+- Distance calculations: `double` arithmetic (`Math.sqrt`) on the scaled values
 - Compass reading: Integer angles (0-360°)
 
-**Impact:** Eliminated floating-point rounding errors, improved navigation stability by ~15%, reduced computational overhead
+**Impact:** Waypoints are easy to read and hand-tune in centimeter units; position is always re-read from the Supervisor, so errors do not accumulate between waypoints
 
 ---
 
@@ -395,7 +398,7 @@ for (int i = 0; i < 100; i++) {
 
 **Solution:** Implemented safety mechanisms:
 1. **Visual loss detection**: Track consecutive steps without green detection (max 30 steps)
-2. **Timeout abort**: Maximum 400 steps per approach attempt
+2. **Timeout abort**: Maximum 300 steps per approach attempt
 3. **Failed approach recovery**: Back up distance and retry from rotated angle
 4. **Max rotation attempts**: 3 full 360° rotations before declaring failure
 5. **Random repositioning**: If search fails, move to different location and retry
@@ -421,7 +424,7 @@ if (totalGreen < 15) {
 ### Main Components
 
 ```
-ProjectController3.java (800+ lines)
+ProjectController3.java (about 760 lines)
 ├── Initialization
 │   ├── Motor setup (wheels, gripper)
 │   ├── Sensor setup (camera, compass, distance)
@@ -514,8 +517,8 @@ private static void makeHardcodedTurn(double x1, double y1,
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/autonomous-warehouse-robot.git
-   cd autonomous-warehouse-robot
+   git clone https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System.git
+   cd Autonomous-Robot-Jar-Collection-System
    ```
 
 2. **Install Webots**
@@ -533,8 +536,12 @@ private static void makeHardcodedTurn(double x1, double y1,
 4. **Open Project in Webots**
    - Launch Webots
    - File → Open World
-   - Navigate to `simulation/ProjectWorld2025.wbt`
+   - Navigate to `ProjectWorld2025.wbt` (at the repository root)
    - Click "Open"
+
+### Known Issues
+
+- The world file references `../protos/Pioneer3dx.proto` and `../protos/Pioneer3Gripper.proto`, which are not in this repository. Webots also expects the standard project layout (`worlds/`, `controllers/ProjectController3/`, `protos/`), while this repo keeps the files flat at the root. The world will not load from a fresh clone until those two PROTO files are added and the files are arranged in that layout.
 
 ---
 
@@ -599,7 +606,7 @@ This project taught me fundamental concepts across multiple disciplines:
 - Root cause analysis for mission failures
 
 ### Software Engineering
-- Large codebase organization (800+ line single file)
+- Large codebase organization (about 760-line single file)
 - API design and hardware abstraction
 - State machine implementation
 - Performance optimization techniques
@@ -657,11 +664,10 @@ If I were to extend this project, I would prioritize:
 ## 📈 Technical Metrics
 
 **Code Statistics:**
-- **Total Lines of Code**: 800+
-- **Methods**: 25+
+- **Total Lines of Code**: about 760
+- **Methods**: 22
 - **Classes**: 1 main class + 1 inner data class
 - **Complexity**: Moderate (straightforward logic, clear flow)
-- **Test Coverage**: 100% of core mission paths
 
 **Performance Metrics:**
 - **Control Loop Frequency**: 30-31 Hz
