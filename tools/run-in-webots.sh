@@ -15,6 +15,10 @@
 #                          0, the default, is the world as it is
 #          --out DIR       where to put the runs (default build/webots-run); docs/ is only updated
 #                          for the default folder and seed 0
+#          --port N        Webots' controller port (default 1234). Give each copy its own when
+#                          running several at once (tools/webots-sweep.sh does)
+#          --set NAME=VAL  change one of v2's Config constants for these runs, e.g.
+#                          --set SONAR_WATCH=true (repeatable; the source isn't modified)
 #
 # Each run gets a temporary copy of the project under build/webots-run/<version>/. The copy's
 # world adds an invisible "observer" supervisor (tools/webots/Observer.java) that records the
@@ -32,13 +36,17 @@ LIMIT=3600
 DRY_RUN=0
 WATCH=0
 SEED=0
+PORT=1234
 RUN_ROOT="build/webots-run"
+SETTINGS=()
 VERSIONS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --limit) LIMIT="$2"; shift 2 ;;
     --seed) SEED="$2"; shift 2 ;;
     --out) RUN_ROOT="$2"; shift 2 ;;
+    --port) PORT="$2"; shift 2 ;;
+    --set) SETTINGS+=("$2"); shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --watch) WATCH=1; shift ;;
     v1|v2|v2-planned) VERSIONS+=("$1"); shift ;;
@@ -103,11 +111,19 @@ for version in "${VERSIONS[@]}"; do
   mkdir -p "$dir/worlds" "$dir/controllers/Observer" "$dir/protos"
   cp protos/*.proto "$dir/protos/"
   cp -R "controllers/$controller" "$dir/controllers/"
-  if [ "$version" = v2-planned ]; then
-    config="$dir/controllers/$controller/Config.java"
-    sed 's/USE_PLANNED_ROUTES = false;/USE_PLANNED_ROUTES = true;/' "$config" > "$config.tmp"
-    mv "$config.tmp" "$config"
-    grep -q 'USE_PLANNED_ROUTES = true;' "$config" || { echo "could not switch on planned routes" >&2; exit 1; }
+  config="$dir/controllers/$controller/Config.java"
+  overrides=("${SETTINGS[@]}")
+  [ "$version" = v2-planned ] && overrides+=(USE_PLANNED_ROUTES=true)
+  if [ "$controller" = JarCollectorV2 ]; then
+    for setting in "${overrides[@]}"; do
+      name=${setting%%=*}
+      value=${setting#*=}
+      sed -E "s/(static final [A-Za-z]+ $name = )[^;]*;/\1$value;/" "$config" > "$config.tmp"
+      mv "$config.tmp" "$config"
+      grep -q "static final [A-Za-z]* $name = $value;" "$config" \
+        || { echo "could not set $name=$value in Config.java" >&2; exit 1; }
+      echo "    $name = $value"
+    done
   fi
   cp tools/webots/Observer.java tools/webots/DeliveryTracker.java "$dir/controllers/Observer/"
   out_abs="$(cd "$dir" && pwd)"
@@ -135,7 +151,7 @@ for version in "${VERSIONS[@]}"; do
     (cd "$dir/controllers/$c" && javac -nowarn -encoding UTF-8 -cp "$CONTROLLER_JAR:." ./*.java)
   done
 
-  cmd=("${LAUNCH[@]}" --batch "${VIEW[@]}" --stdout --stderr "$out_abs/worlds/$world")
+  cmd=("${LAUNCH[@]}" --port="$PORT" --batch "${VIEW[@]}" --stdout --stderr "$out_abs/worlds/$world")
   if [ "$DRY_RUN" = 1 ]; then
     echo "    would run: ${cmd[*]}"
     continue

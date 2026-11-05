@@ -9,9 +9,12 @@
 #          --jobs N      worlds to run at once (default 2; each Webots uses about one core)
 #          --limit S     simulated-time limit per run (default 1800)
 #          --publish     also copy the report to docs/webots-sweep.md
+#          --set N=V     passed on to tools/run-in-webots.sh (change a v2 setting; repeatable)
+#          --out DIR     where to put the runs (default build/webots-sweep)
 #
 # Each seed's runs go to build/webots-sweep/seed-<n>/ (as tools/run-in-webots.sh lays them out)
-# and the summary to build/webots-sweep/report.md.
+# and the summary to build/webots-sweep/report.md. Each seed gets its own Webots port (1300 + seed):
+# copies of Webots that share one can end each other's simulations.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,6 +22,8 @@ SEEDS=1-10
 JOBS=2
 LIMIT=1800
 PUBLISH=0
+OUT=build/webots-sweep
+SETS=""
 VERSIONS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -26,6 +31,8 @@ while [ $# -gt 0 ]; do
     --jobs) JOBS="$2"; shift 2 ;;
     --limit) LIMIT="$2"; shift 2 ;;
     --publish) PUBLISH=1; shift ;;
+    --set) SETS="$SETS --set $2"; shift 2 ;;
+    --out) OUT="$2"; shift 2 ;;
     v1|v2|v2-planned) VERSIONS+=("$1"); shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -34,12 +41,11 @@ done
 first=${SEEDS%-*}
 last=${SEEDS#*-}
 
-OUT=build/webots-sweep
 mkdir -p "$OUT"
 echo "==> Seeds $first-$last, versions ${VERSIONS[*]}, $JOBS at a time, limit $LIMIT s"
 export LIMIT OUT
 seq "$first" "$last" | xargs -P "$JOBS" -I{} sh -c \
-  'tools/run-in-webots.sh --seed {} --out "$OUT/seed-{}" --limit "$LIMIT" '"${VERSIONS[*]}"' \
+  'tools/run-in-webots.sh --seed {} --out "$OUT/seed-{}" --limit "$LIMIT" --port $((1300 + {}))'"$SETS ${VERSIONS[*]}"' \
      > "$OUT/seed-{}.log" 2>&1 && echo "    seed {} done" || echo "    seed {} FAILED (see $OUT/seed-{}.log)"'
 
 echo "==> Writing report"
