@@ -43,9 +43,17 @@ public class ProjectController3 {
   private static void delay(int milliseconds, int timeStep) {
     int elapsedTime = 0;
     while (elapsedTime < milliseconds) {
-      robot.step(timeStep);
+      step(timeStep);
       elapsedTime += timeStep;
     }
+  }
+
+  // Advances the simulation by one time step. Webots returns -1 when the
+  // simulation is ending, and the controller must then exit; ignoring it
+  // would leave the main loop running forever.
+  private static void step(int timeStep) {
+    if (robot.step(timeStep) == -1)
+      System.exit(0);
   }
   
   public static void liftLowerGripper(float position) {
@@ -110,7 +118,7 @@ public class ProjectController3 {
     // DEBUG: Test sensor values
     System.out.println("\n=== SENSOR DEBUG TEST ===");
     for (int i = 0; i < 10; i++) {
-      robot.step(timeStep);
+      step(timeStep);
       System.out.println("Front sensors: L=" + leftAheadSensor.getValue() + 
                         " R=" + rightAheadSensor.getValue() +
                         " Angled: L=" + leftAngledSensor.getValue() +
@@ -210,7 +218,7 @@ public class ProjectController3 {
     rightMotor.setVelocity(MAX_SPEED / 4);
     
     for (int step = 0; step < totalSteps; step++) {
-      robot.step(timeStep);
+      step(timeStep);
       
       if (step % stepsPerCheck == 0) {
         // Check for green
@@ -362,7 +370,7 @@ public class ProjectController3 {
         
         // Take 5 steps to look around slightly
         for (int i = 0; i < 5; i++) {
-          robot.step(timeStep);
+          step(timeStep);
         }
       }
       
@@ -397,13 +405,13 @@ public class ProjectController3 {
     
     // Wait a moment to stabilize
     for (int i = 0; i < 10; i++) {
-      robot.step(timeStep);
+      step(timeStep);
     }
     
     System.out.println("Step 1: Closing gripper...");
     // Close gripper gradually
     for (int i = 0; i < 100; i++) {
-      robot.step(timeStep);
+      step(timeStep);
       openCloseGripper(0.01f);
       leftMotor.setVelocity(0);
       rightMotor.setVelocity(0);
@@ -412,7 +420,7 @@ public class ProjectController3 {
     System.out.println("Step 2: Lifting gripper...");
     // Lift gripper
     for (int i = 0; i < 120; i++) {
-      robot.step(timeStep);
+      step(timeStep);
       liftLowerGripper(-0.0499f);
       openCloseGripper(0.01f);
       leftMotor.setVelocity(0);
@@ -422,7 +430,7 @@ public class ProjectController3 {
     System.out.println("Step 3: Verifying grab...");
     // Wait and verify
     for (int i = 0; i < 20; i++) {
-      robot.step(timeStep);
+      step(timeStep);
     }
     
     System.out.println(">>> GRAB COMPLETE! <<<\n");
@@ -442,7 +450,7 @@ public class ProjectController3 {
     rightMotor.setVelocity(MAX_SPEED / 3);
     
     for (int i = 0; i < 60; i++) {
-      robot.step(timeStep);
+      step(timeStep);
     }
     
     leftMotor.setVelocity(0);
@@ -454,7 +462,7 @@ public class ProjectController3 {
     System.out.println("Backing up " + steps + " steps...");
     
     for (int i = 0; i < steps; i++) {
-      robot.step(timeStep);
+      step(timeStep);
       leftMotor.setVelocity(-MAX_SPEED / 3);
       rightMotor.setVelocity(-MAX_SPEED / 3);
     }
@@ -644,7 +652,7 @@ public class ProjectController3 {
     
     // Release jar
     for (int i = 0; i < 50; i++) {
-      robot.step(timeStep);
+      step(timeStep);
       openCloseGripper(0.099f);
       liftLowerGripper(0.001f);
     }
@@ -745,18 +753,24 @@ public class ProjectController3 {
     
     while(robot.step(timeStep) != -1) {
       int degrees = (getCompassReadingInDegrees(compass)+360)%360;
-      if (degrees > finalAngle - 3 && degrees < finalAngle + 3) 
-        break;
-       
       int distTurningRight = (degrees - finalAngle + 360)%360;
       int distTurningLeft = (finalAngle - degrees + 360)%360;
-      
+      // Within 3 degrees either way, measured around the circle so that
+      // 359 counts as close to a target of 0
+      int remaining = Math.min(distTurningRight, distTurningLeft);
+      if (remaining < 3)
+        break;
+
+      // Slow down for the last few degrees: at full speed one time step turns
+      // about 5 degrees, enough to jump over the 3-degree window and swing
+      // back and forth around the target indefinitely
+      double speed = remaining < 15 ? MAX_SPEED / 4 : MAX_SPEED;
       if (distTurningRight < distTurningLeft) {
-        leftMotor.setVelocity(MAX_SPEED);
-        rightMotor.setVelocity(-MAX_SPEED);   
+        leftMotor.setVelocity(speed);
+        rightMotor.setVelocity(-speed);
       } else {
-        leftMotor.setVelocity(-MAX_SPEED);
-        rightMotor.setVelocity(MAX_SPEED);
+        leftMotor.setVelocity(-speed);
+        rightMotor.setVelocity(speed);
       }
     }
     

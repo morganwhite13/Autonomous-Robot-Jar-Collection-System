@@ -247,12 +247,14 @@ Adjust motor velocities:
     ↓
 Monitor compass continuously
     ↓
+Slow to quarter speed within 15° of the target
+    ↓
 Dynamic correction to maintain heading
     ↓
-Hold until within ±3° of target → Stop and proceed
+Hold until within ±3° of target (measured around the circle) → Stop and proceed
 ```
 
-This ensures accuracy even when overshooting or dealing with compass noise.
+The slow final approach matters: at full speed one 32 ms time step turns the robot about 5°, which can jump right over the ±3° window and leave it swinging back and forth around the target. `test/run_turn_test.sh` checks this without Webots (see "Testing without Webots").
 
 ### 5. Sensor Fusion Strategy
 
@@ -574,6 +576,18 @@ private static void makeHardcodedTurn(double x1, double y1,
 4. **Completion**
    - Program exits when all 5 jars are collected
    - Final message: `=== ALL JARS COLLECTED! ===`
+   - The controller also exits when the simulation stops or is reset (Webots' `step` returns -1)
+
+### Testing without Webots
+
+`test/run_turn_test.sh` compiles the controller against a minimal stand-in for the Webots controller API (`test/stub`), in which the compass heading changes with the difference in wheel speeds, and runs `makeHardcodedTurn` from every start heading to every target heading on a 10° grid. It needs only a JDK:
+
+```bash
+./test/run_turn_test.sh
+# turn rate 0.0094: 1296/1296 turns ended within 4 degrees; worst case 40 steps
+```
+
+Without the slow final approach, about 10% of these turns never settle at the realistic turn rate (0.0094 rad per step per unit of wheel-speed difference). The stand-in models heading only, not position, sensors or the camera.
 
 ---
 
