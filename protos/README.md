@@ -34,7 +34,7 @@ An earlier version of these files had the header changed to R2025a. Webots then 
 
 ## How far they have been checked
 
-- **Loaded and driven in Webots R2025a** (Linux, headless) by `tools/run-in-webots.sh`. Webots converts the R2021b content as described above, and the robot drives, turns, scans and grabs as the controllers expect. See [the Webots results](../docs/webots-results.md).
+- **Loaded and driven in Webots R2025a** (Linux, headless) by `tools/run-in-webots.sh`. Webots converts the R2021b content as described above, and the robot drives, turns, scans and grabs as the controllers expect.
 - **Checked statically against Webots R2025a.** Every node type the three files use (40 in total) exists in R2025a's node definitions (`resources/nodes/*.wrl`), and so does every field they set. R2025a's `WorldInfo` still accepts `coordinateSystem "NUE"`. All 19 `webots://` texture paths exist in the R2025a release.
 - They are still reconstructions. If you have the originals from the project folder you first ran it in, those are the ground truth.
 
