@@ -222,21 +222,25 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 
 ## The original README vs the code
 
-The original README is kept unchanged in [`v1-original-README.md`](v1-original-README.md). A few of its claims didn't match the code, so the new README describes what the code actually does:
+The original README is kept unchanged in [`v1-original-README.md`](v1-original-README.md). Checking it against the code turned up something unexpected: **the repository held two different controllers.**
 
-| Original README | The v1 code |
-|---|---|
-| "Operate without GPS, pre-mapped routes, or external guidance systems" | The controller is a Webots Supervisor that reads the robot's exact position from the simulator (`getSelf().getField("translation")`) and follows hand-tuned waypoint routes. Only jar detection relies on the onboard camera and touch sensor |
-| Distance sensors "prevent collisions throughout mission" | They're enabled and printed during a start-up debug test (lines 110-119), then never read again |
-| Accelerometer for "stability monitoring" | It's in the world file but never enabled or read |
-| Blue detection "used for navigation guidance during return phase" | Blue pixels are counted (line 544) but the result is never used |
-| "Max speed: 5 m/s", "reduced speed (1 m/s) during precision turns" | `MAX_SPEED = 5` is wheel speed in rad/s, about 0.49 m/s. Turns run at full speed |
-| Approach "maximum 400 steps" | 300 (see bug 7) |
-| "Rotate 360°" scan | About 271° (see bug 6) |
-| Turn when green leads by "15+ pixels" | `EPSILON = 10` |
-| "Centimetre-scale integer math eliminates floating-point errors… ~15% more stable" | Positions and distances are `double`; only the waypoint `Point`s are integers |
-| "Test Coverage: 100% of core mission paths" | There were no tests |
-| Open `simulation/ProjectWorld2025.wbt` | That folder didn't exist |
+- **v1** is the committed source, `ProjectController3.java`, with `intelligentJarSearch`, `carefullyApproachGreen` and `executeGrab`.
+- **v0** is an earlier version that survived only as the stale `ProjectController3.class` (deleted here; still in git history at `d598324`). Decompiled, it has `findJar()`, `toStart()`, `hardcodedPath()` and `placeJar()`, green thresholds of R < 80, G > 50 and B < 80, and `EPSILON = 15`. Its `toStart()` slows to `MAX_SPEED = 1` for turns.
+
+The original README mixes descriptions of both, so several claims that look wrong for v1 were accurate for v0. The demo videos could show either version; only the author knows which. The new README describes the code that's actually in the repository.
+
+| Original README | v0 (stale `.class`) | v1 (committed source) |
+|---|---|---|
+| "Operate without GPS, pre-mapped routes, or external guidance systems" | No: both are Webots Supervisors that read the robot's exact position from the simulator and follow hand-tuned waypoint routes. Only jar detection uses the onboard camera and touch sensor. | Same as v0 |
+| Distance sensors "prevent collisions throughout mission" | No: enabled, never read | No: printed in a start-up debug test (lines 110-119), never used |
+| Accelerometer for "stability monitoring" | No: never enabled or read | No: never enabled or read |
+| Blue detection "used for navigation guidance during return phase" | No: blue counts are computed in `findJar()` but never used | No: counted (line 544), never used |
+| "Max speed: 5 m/s", "reduced speed (1 m/s) during precision turns" | Yes, apart from the units: 5 and 1 are wheel speeds in rad/s (about 0.49 and 0.1 m/s) | 5 rad/s; turns always run at full speed |
+| "Three-tier fallback" detection; turn when green leads by "15+ pixels" | Yes: `EPSILON = 15`, then a relative comparison, then a raw count above 10 | Partly: one margin, `EPSILON = 10` |
+| Approach "maximum 400 steps"; "rotate 360°" scan | Not applicable: v0 approaches differently | 300 steps effective (bug 7); the scan turns about 271° (bug 6) |
+| "Centimetre-scale integer math eliminates floating-point errors… ~15% more stable" | No: `double` maths | No: positions and distances are `double`; only the waypoint `Point`s are integers |
+| "Test Coverage: 100% of core mission paths" | No tests | No tests |
+| Open `simulation/ProjectWorld2025.wbt` | That folder didn't exist | That folder didn't exist |
 
 ---
 

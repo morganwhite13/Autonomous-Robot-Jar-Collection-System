@@ -10,16 +10,16 @@ This repository holds **two versions side by side**:
 
 | | |
 |---|---|
-| **v1: original** | The controller from the demo videos, kept **byte-for-byte unchanged** in [`controllers/ProjectController3`](controllers/ProjectController3/ProjectController3.java) |
+| **v1: original** | The committed controller source, kept **byte-for-byte unchanged** in [`controllers/ProjectController3`](controllers/ProjectController3/ProjectController3.java). The repo also held an even older compiled version, v0; see [two controllers in one repo](docs/BEFORE_AND_AFTER.md#the-original-readme-vs-the-code). |
 | **v2: improved** | Same routes, thresholds and gripper timings, restructured into testable classes with 9 bugs and 4 smaller issues fixed, in [`controllers/JarCollectorV2`](controllers/JarCollectorV2/) |
 
 👉 **[Full before/after write-up](docs/BEFORE_AND_AFTER.md)**: each fix with the original line numbers, plus [measured results](docs/benchmark-results.md).
 
-**Contents:** [Video demos](#-video-demos-v1) · [Before and after](#️-before-and-after-at-a-glance) · [The mission](#️-the-mission) · [How it works](#️-how-it-works) · [Running it](#-running-it) · [Repository layout](#-repository-layout) · [What I learned](#-what-i-learned) · [Future improvements](#-future-improvements) · [License](#-license) · [Contact](#-contact)
+**Contents:** [Video demos](#-video-demos-original-project) · [Before and after](#️-before-and-after-at-a-glance) · [The mission](#️-the-mission) · [How it works](#️-how-it-works) · [Running it](#-running-it) · [Repository layout](#-repository-layout) · [What I learned](#-what-i-learned) · [Future improvements](#-future-improvements) · [License](#-license) · [Contact](#-contact)
 
 ---
 
-## 📺 Video demos (v1)
+## 📺 Video demos (original project)
 
 - **[Main robot demo](https://www.youtube.com/watch?v=kO9e8dzjCfg)**: a full autonomous mission collecting the jars
 - **[Top-down overview](https://www.youtube.com/watch?v=dIo8oXvvNeM)**: aerial view of navigation and collection
