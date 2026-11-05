@@ -280,21 +280,25 @@ final class JarHandler {
   }
 
   /**
-   * v1's wheel speeds for each steering decision (UNCLEAR is handled by the caller), scaled up
-   * while the jar is estimated to be far away.
+   * v1's wheel speeds for each steering decision (UNCLEAR is handled by the caller). While the
+   * jar is still far away the same extra speed is added to both wheels: the robot closes in
+   * faster but turns no more sharply than v1's creep, so the jar stays in the camera's view.
    */
   private void steer(Vision.Steering steering, double jarDistanceCm) {
-    double s = jarDistanceCm > Config.FAST_APPROACH_UNTIL_CM
-        ? Config.FAST_APPROACH_SPEED : Config.APPROACH_SPEED;
+    double s = Config.APPROACH_SPEED;
+    double boost = jarDistanceCm > Config.FAST_APPROACH_UNTIL_CM
+        ? Config.FAST_APPROACH_SPEED - Config.APPROACH_SPEED : 0;
+    double inner = s * Config.APPROACH_INNER_FACTOR + boost;
+    double outer = s * Config.APPROACH_OUTER_FACTOR + boost;
     switch (steering) {
       case LEFT:
-        robot.drive(s * Config.APPROACH_INNER_FACTOR, s * Config.APPROACH_OUTER_FACTOR);
+        robot.drive(inner, outer);
         break;
       case RIGHT:
-        robot.drive(s * Config.APPROACH_OUTER_FACTOR, s * Config.APPROACH_INNER_FACTOR);
+        robot.drive(outer, inner);
         break;
       case STRAIGHT:
-        robot.drive(s, s);
+        robot.drive(s + boost, s + boost);
         break;
       default:
         throw new IllegalArgumentException("no wheel speeds for " + steering);
