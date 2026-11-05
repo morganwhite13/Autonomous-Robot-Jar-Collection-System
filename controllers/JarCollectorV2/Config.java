@@ -131,7 +131,16 @@ final class Config {
   static final double FINGERS_OPEN = 0.099;
   static final double FINGERS_CLOSED = 0.01;
   static final double LIFT_DOWN = 0.001;
+  /** v1: lift height after a grab. v2 uses it only for the short run onto the drop-off pad. */
   static final double LIFT_UP = -0.0499;
+  /**
+   * new: how high v2 lifts a jar to carry it. In Webots a jar lifted to LIFT_UP (5 cm) often
+   * slipped out of the fingers on hard stops and turns (1 of 3 kept through four 4 m runs and
+   * 180 degree turns); lifted 0.8 cm it was kept in 6 of 6, including grabs 4 and 7 cm off
+   * centre, and any slip sets it down upright between the fingers. Set to LIFT_UP for v1
+   * behaviour.
+   */
+  static final double CARRY_LIFT = -0.008;
   static final int STARTUP_SETTLE_MS = 1000;
   static final int GRAB_SETTLE_STEPS = 10;
   static final int GRAB_CLOSE_STEPS = 100;
@@ -179,7 +188,11 @@ final class Config {
    * the delivery. Set to false for v1 behaviour.
    */
   static final boolean WATCH_GRIP_WHILE_CARRYING = true;
-  static final int DROP_CONFIRM_STEPS = 5;
+  /**
+   * new: in Webots the force dips below the threshold for up to 9 steps while the jar is still
+   * held, and stays down for good once it has fallen out; 30 steps (about 1 s) tells them apart.
+   */
+  static final int DROP_CONFIRM_STEPS = 30;
   // ------------------------------------------------------------------ detours (new)
   /**
    * new: when a leg of a travel route stalls (not the box-clearing route, which is meant to push

@@ -213,7 +213,7 @@ final class JarHandler {
     robot.setFingers(Config.FINGERS_CLOSED);
     robot.waitSteps(Config.GRAB_CLOSE_STEPS);
     Log.info("Lifting jar");
-    robot.setLift(Config.LIFT_UP);
+    robot.setLift(Config.CARRY_LIFT);
     robot.waitSteps(Config.GRAB_LIFT_STEPS);
     robot.waitSteps(Config.GRAB_HOLD_STEPS);
     // v1 printed "Verifying grab..." but did not check anything. v2 logs what the camera sees
@@ -280,6 +280,8 @@ final class JarHandler {
    */
   boolean place(int jarIndex, BooleanSupplier holding) {
     Log.info("Placing jar in slot " + (jarIndex + 1) + " (y=" + Routes.slotY(jarIndex) + ")");
+    // Raised to v1's height for the short run in, so the jar rides onto the pad as in v1.
+    robot.setLift(Config.LIFT_UP);
     Navigator.RouteResult result = nav.drive(Routes.placementPath(jarIndex),
         new Navigator.Travel().turnSpeed(Config.CARRY_TURN_SPEED).keepGoingWhile(holding));
     robot.setFingers(Config.FINGERS_OPEN);

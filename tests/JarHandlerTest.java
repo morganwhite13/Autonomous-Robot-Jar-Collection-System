@@ -65,7 +65,7 @@ class JarHandlerTest {
     robot.jars.add(Vec2.of(150, 0));
     assertTrue(handler(robot).approachAndGrab());
     assertNotNull(robot.heldJar);
-    assertTrue(robot.lift <= Config.LIFT_UP && robot.fingers <= Config.FINGERS_CLOSED);
+    assertTrue(robot.lift <= Config.CARRY_LIFT && robot.fingers <= Config.FINGERS_CLOSED);
   }
 
   @Test
@@ -123,7 +123,7 @@ class JarHandlerTest {
     assertEquals(v1Steps, robot.stepsTaken());
     assertNotNull(robot.heldJar);
     assertEquals(Config.FINGERS_CLOSED, robot.fingers);
-    assertEquals(Config.LIFT_UP, robot.lift);
+    assertEquals(Config.CARRY_LIFT, robot.lift); // lower than v1's LIFT_UP: see Config
     assertTrue(robot.isStopped());
   }
 
@@ -164,7 +164,7 @@ class JarHandlerTest {
     JarHandler handler = new JarHandler(robot, new Navigator(robot, stats), stats, new Random(1));
     assertTrue(handler.approachAndGrab());
     assertEquals(3 + 250, robot.steps);
-    assertEquals(Config.LIFT_UP, robot.lift);
+    assertEquals(Config.CARRY_LIFT, robot.lift);
   }
 
   @Test

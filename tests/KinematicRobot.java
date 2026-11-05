@@ -355,7 +355,7 @@ final class KinematicRobot implements RobotPlatform {
   @Override
   public void setLift(double position) {
     lift = position;
-    if (position <= Config.LIFT_UP + GRIPPER_TOLERANCE
+    if (position <= Config.CARRY_LIFT + GRIPPER_TOLERANCE
         && fingers <= Config.FINGERS_CLOSED + GRIPPER_TOLERANCE && heldJar == null
         && !missedThisGrab) {
       Vec2 jar = touchedJar();
