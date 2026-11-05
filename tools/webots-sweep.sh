@@ -44,6 +44,8 @@ last=${SEEDS#*-}
 mkdir -p "$OUT"
 echo "==> Seeds $first-$last, versions ${VERSIONS[*]}, $JOBS at a time, limit $LIMIT s"
 export LIMIT OUT
+# The single-quoted parts are expanded by the inner shell (OUT and LIMIT are exported).
+# shellcheck disable=SC2016
 seq "$first" "$last" | xargs -P "$JOBS" -I{} sh -c \
   'tools/run-in-webots.sh --seed {} --out "$OUT/seed-{}" --limit "$LIMIT" --port $((1300 + {}))'"$SETS ${VERSIONS[*]}"' \
      > "$OUT/seed-{}.log" 2>&1 && echo "    seed {} done" || echo "    seed {} FAILED (see $OUT/seed-{}.log)"'
