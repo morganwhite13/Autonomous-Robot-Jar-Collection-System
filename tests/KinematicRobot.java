@@ -292,9 +292,10 @@ final class KinematicRobot implements RobotPlatform {
     return Vec2.of(x, y);
   }
 
+  /** A jar can only come between the fingers, and press the bumper, while they are open. */
   @Override
   public boolean jarTouched() {
-    return touchedJar() != null;
+    return fingers >= Config.FINGERS_OPEN - GRIPPER_TOLERANCE && touchedJar() != null;
   }
 
   private Vec2 touchedJar() {

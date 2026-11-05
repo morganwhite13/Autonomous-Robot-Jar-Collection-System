@@ -134,17 +134,19 @@ final class Navigator {
    * no way round.
    */
   private DriveResult detour(Vec2 target, Travel travel, double blockerAheadCm) {
-    Vec2[] blocker = squareAhead(robot.positionCm(), robot.headingDeg(), blockerAheadCm,
+    Vec2 stoppedAt = robot.positionCm();
+    Vec2[] blocker = squareAhead(stoppedAt, robot.headingDeg(), blockerAheadCm,
         Config.DETOUR_BLOCKER_SIZE_CM);
-    Vec2 centre = Vec2.of((blocker[0].x + blocker[2].x) / 2, (blocker[0].y + blocker[2].y) / 2);
     driveSteps(-Config.MANOEUVRE_SPEED, Config.DETOUR_BACKUP_STEPS);
     List<Vec2> legs = plannedLegs(ArenaMap.planner(List.<Vec2[]>of(blocker)), target);
     if (legs.isEmpty()) {
-      Log.warn("no way around the obstacle at " + centre + "; skipping to the next leg");
+      Log.warn("no way around what stopped the robot at " + stoppedAt
+          + "; skipping to the next leg");
       return DriveResult.STALLED;
     }
     stats.recordDetour();
-    Log.info("Detour around an obstacle at " + centre + ": " + legs.size() + " legs to " + target);
+    Log.info("Detour around what stopped the robot at " + stoppedAt + ": " + legs.size()
+        + " legs to " + target);
     for (Vec2 leg : legs) {
       DriveResult result = goTo(leg, travel);
       if (result != DriveResult.ARRIVED) {

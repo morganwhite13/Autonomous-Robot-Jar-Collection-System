@@ -375,4 +375,16 @@ class NavigatorTest {
     assertEquals(Navigator.RouteResult.CLEAN, nav(robot).driveViaPlan(target, new Navigator.Travel()));
     assertTrue(robot.positionCm().distanceTo(target) < 5, "ended at " + robot.positionCm());
   }
+
+  @Test
+  void aDetourToAPointOffTheMapGivesUpAndSkipsTheLeg() throws Exception {
+    KinematicRobot robot = carryLegWithBoxInTheWay();
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    // Straight through the box to a point beyond the arena: no route can end there.
+    Navigator.RouteResult result = new Navigator(robot, stats)
+        .drive(List.of(Vec2.of(-2000, 200)), new Navigator.Travel().detours(true));
+    assertEquals(Navigator.RouteResult.WITH_PROBLEMS, result);
+    assertEquals(1, stats.driveStalls());
+    assertEquals(0, stats.detours());
+  }
 }

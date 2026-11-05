@@ -432,6 +432,9 @@ class JarHandlerTest {
     }
     assertTrue(handler.searchAndGrab());
     assertEquals(1, handler.rememberedJars().size());
+    // The nearer jar, (120, 0), was fetched first; the one left is (0, 140).
+    assertTrue(handler.rememberedJars().get(0).distanceTo(Vec2.of(0, 140)) < 15,
+        handler.rememberedJars().toString());
   }
 
   /** A scripted robot whose finger force follows a list of readings, then stays at the last. */
@@ -455,7 +458,7 @@ class JarHandlerTest {
     for (int k = 0; k < confirm - 1; k++) {
       readings[i++] = 0.2; // a dip one reading too short to count
     }
-    readings[i++] = 0.9; // the grip recovers
+    readings[i++] = Config.GRIP_EFFORT_HOLDING; // the grip recovers: exactly at the threshold
     readings[i++] = Double.NaN; // can't tell: counts as holding
     for (int k = 0; k < confirm; k++) {
       readings[i++] = 0.1; // gone for good
@@ -491,5 +494,23 @@ class JarHandlerTest {
     assertEquals(Config.LIFT_DOWN, robot.lift);
     assertTrue(robot.isStopped());
     assertTrue(robot.positionCm().distanceTo(Vec2.of(-850, 607)) < 1e-9, "moved: " + robot.positionCm());
+  }
+
+  @Test
+  void aFarJarIsApproachedFasterButSteeredAsSharplyAsV1Did() {
+    double s = Config.APPROACH_SPEED;
+    double boost = Config.FAST_APPROACH_SPEED - s;
+    ScriptedRobot left = new ScriptedRobot();
+    left.left = 40; // far away: green high in the frame
+    left.touchedAtStep = step -> step >= 2;
+    handler(left).approachAndGrab();
+    assertArrayEquals(new double[] {s * Config.APPROACH_INNER_FACTOR + boost,
+        s * Config.APPROACH_OUTER_FACTOR + boost}, left.commands.get(0), 1e-12);
+    ScriptedRobot right = new ScriptedRobot();
+    right.right = 40;
+    right.touchedAtStep = step -> step >= 2;
+    handler(right).approachAndGrab();
+    assertArrayEquals(new double[] {s * Config.APPROACH_OUTER_FACTOR + boost,
+        s * Config.APPROACH_INNER_FACTOR + boost}, right.commands.get(0), 1e-12);
   }
 }
