@@ -40,6 +40,13 @@ final class Config {
    * bang-bang turns.
    */
   static final double TURN_MIN_SPEED = 0.6;
+  /**
+   * new: while a jar is held (carrying it to the drop-off and placing it), route turns are capped
+   * at this wheel speed. In Webots, turning in place at MAX_SPEED (as v1 did) throws the jar out
+   * of the gripper within about 0.6 s; MAX_SPEED / 2 and MAX_SPEED / 3 both keep it. Driving
+   * straight at full speed and stopping hard both keep it too. Set to MAX_SPEED for v1 behaviour.
+   */
+  static final double CARRY_TURN_SPEED = MAX_SPEED / 3;
   /** new: abandon a turn that hasn't converged after this many steps (v1 could loop forever). */
   static final int TURN_TIMEOUT_STEPS = 400;
 

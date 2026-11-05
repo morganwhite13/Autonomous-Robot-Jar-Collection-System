@@ -136,4 +136,27 @@ class LegacyBehaviourTest {
     assertTrue(new LegacyV1Mission(robot, 1).intelligentJarSearch());
     assertNull(robot.heldJar);
   }
+
+  @Test
+  void v1ThrowsTheJarOnItsFirstTurnTowardsTheDropoff() {
+    // After a grab v1 turns towards the first drop-off waypoint at full speed (makeHardcodedTurn,
+    // line 722). In Webots that throws the jar out of the gripper; v2 turns at CARRY_TURN_SPEED.
+    for (boolean v2 : new boolean[] {false, true}) {
+      KinematicRobot robot = new KinematicRobot(Vec2.of(850, 60), -90);
+      robot.throwsJarAboveTurnSpeed = Config.MAX_SPEED / 2;
+      robot.jars.add(Vec2.of(850, 60 - KinematicRobot.TOUCH_DISTANCE_CM));
+      robot.setFingers(Config.FINGERS_CLOSED);
+      robot.setLift(Config.LIFT_UP);
+      Vec2 firstWaypoint = LegacyV1.navigateToDropoff().get(0); // (850, 100): behind the robot
+      if (v2) {
+        new Navigator(robot, new MissionStats(robot::elapsedMs))
+            .followRoute(java.util.List.of(firstWaypoint), false, Config.CARRY_TURN_SPEED);
+        assertEquals(java.util.List.of(), robot.thrownJars, "v2");
+      } else {
+        LegacyV1.makeHardcodedTurn(robot, 850, 60, firstWaypoint.x, firstWaypoint.y, 1000);
+        assertEquals(1, robot.thrownJars.size(), "v1");
+        assertNull(robot.heldJar);
+      }
+    }
+  }
 }

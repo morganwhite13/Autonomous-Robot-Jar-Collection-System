@@ -238,7 +238,7 @@ final class JarHandler {
   /** v1 placeJar: drive into the slot for this jar, open and lower the gripper, back out. */
   void place(int jarIndex) {
     Log.info("Placing jar in slot " + (jarIndex + 1) + " (y=" + Routes.slotY(jarIndex) + ")");
-    nav.followRoute(Routes.placementPath(jarIndex));
+    nav.followRoute(Routes.placementPath(jarIndex), false, Config.CARRY_TURN_SPEED);
     robot.setFingers(Config.FINGERS_OPEN);
     robot.setLift(Config.LIFT_DOWN);
     robot.waitSteps(Config.RELEASE_STEPS);

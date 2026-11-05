@@ -144,7 +144,7 @@ final class Mission {
   /** Carries the held jar to the drop-off and places it in slot {@code jarIndex}. */
   private void deliver(int jarIndex) {
     stats.beginPhase(PHASE_TO_DROPOFF);
-    nav.followRoute(routes.searchToDropoff, options.sonarWatch);
+    nav.followRoute(routes.searchToDropoff, options.sonarWatch, Config.CARRY_TURN_SPEED);
     stats.beginPhase(PHASE_PLACE);
     jars.place(jarIndex);
     stats.jarDelivered();

@@ -45,6 +45,17 @@ class MissionTest {
   }
 
   @Test
+  void carriesEveryJarWithoutThrowingItWhenFastTurnsWould() {
+    // In Webots a held jar flies out when the robot turns in place at 5 rad/s (v1's speed) but
+    // stays put at 2.5 rad/s. The model's threshold sits between the two measurements.
+    KinematicRobot robot = robotWithJars();
+    robot.throwsJarAboveTurnSpeed = Config.MAX_SPEED / 2;
+    assertEquals(5, new Mission(robot).run());
+    assertEquals(5, robot.deliveredJars.size());
+    assertEquals(List.of(), robot.thrownJars);
+  }
+
+  @Test
   void optInPlannedRoutesAlsoDeliverAllJarsAndFinishSooner() {
     KinematicRobot handTuned = robotWithJars();
     assertEquals(5, new Mission(handTuned, Routes.HAND_TUNED).run());

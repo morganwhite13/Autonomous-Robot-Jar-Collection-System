@@ -15,6 +15,8 @@ import java.util.Locale;
  *   <li>Drives detect stalls and have a timeout. v1 looped forever if the robot was blocked.</li>
  *   <li>Optionally ({@link Config#SONAR_WATCH}), travel legs use the front sonars to slow down for
  *       and stop short of obstacles. v1 never used the sonars.</li>
+ *   <li>Routes driven with a jar in the gripper turn more slowly
+ *       ({@link Config#CARRY_TURN_SPEED}). v1 turned at full speed, which throws the jar out.</li>
  * </ul>
  */
 final class Navigator {
@@ -39,9 +41,14 @@ final class Navigator {
    * short of obstacles the front sonars see (see {@link Config#SONAR_WATCH}).
    */
   boolean followRoute(List<Vec2> waypoints, boolean watchAhead) {
+    return followRoute(waypoints, watchAhead, Config.MAX_SPEED);
+  }
+
+  /** As {@link #followRoute(List, boolean)}, turning towards each waypoint at most this fast. */
+  boolean followRoute(List<Vec2> waypoints, boolean watchAhead, double turnSpeed) {
     boolean clean = true;
     for (Vec2 waypoint : waypoints) {
-      clean &= goTo(waypoint, watchAhead) == DriveResult.ARRIVED;
+      clean &= goTo(waypoint, watchAhead, turnSpeed) == DriveResult.ARRIVED;
     }
     return clean;
   }
@@ -51,11 +58,15 @@ final class Navigator {
   }
 
   DriveResult goTo(Vec2 target, boolean watchAhead) {
+    return goTo(target, watchAhead, Config.MAX_SPEED);
+  }
+
+  DriveResult goTo(Vec2 target, boolean watchAhead, double turnSpeed) {
     Vec2 here = robot.positionCm();
     if (here.distanceTo(target) < 1.0) {
       return DriveResult.ARRIVED;
     }
-    turnTo(here.bearingTo(target), Config.MAX_SPEED);
+    turnTo(here.bearingTo(target), turnSpeed);
     return driveTo(target, watchAhead);
   }
 

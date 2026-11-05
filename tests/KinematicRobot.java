@@ -58,6 +58,14 @@ final class KinematicRobot implements RobotPlatform {
   int grabsThatMiss;
   /** True from a missed grab until the fingers open again. */
   private boolean missedThisGrab;
+  /**
+   * If set (rad/s), a held jar is thrown out of the gripper when the robot turns in place with both
+   * wheels faster than this. Off by default. Measured in Webots: turning at 5 rad/s (v1's speed)
+   * throws the jar within 0.6 s; 2.5 and 1.67 rad/s keep it.
+   */
+  double throwsJarAboveTurnSpeed = Double.POSITIVE_INFINITY;
+  /** Where thrown jars landed. They land on their side, so they can't be grabbed again. */
+  final List<Vec2> thrownJars = new ArrayList<>();
   double fingers = Config.FINGERS_OPEN;
   double lift = Config.LIFT_DOWN;
   /**
@@ -134,6 +142,12 @@ final class KinematicRobot implements RobotPlatform {
       double[] applied = pendingCommands.removeFirst();
       leftSpeed = applied[0];
       rightSpeed = applied[1];
+    }
+    if (heldJar != null && leftSpeed * rightSpeed < 0
+        && Math.min(Math.abs(leftSpeed), Math.abs(rightSpeed)) > throwsJarAboveTurnSpeed) {
+      double h = Math.toRadians(heading);
+      thrownJars.add(Vec2.of(x + TOUCH_DISTANCE_CM * Math.cos(h), y + TOUCH_DISTANCE_CM * Math.sin(h)));
+      heldJar = null;
     }
     double dt = timeStepMs / 1000.0;
     double v = WHEEL_RADIUS_CM * (leftSpeed + rightSpeed) / 2;
