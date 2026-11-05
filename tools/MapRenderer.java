@@ -3,14 +3,21 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * Draws the arena from the .wbt file plus the waypoint routes from {@link Routes} as an SVG,
- * so the picture in the README is generated from the same data the controller uses.
+ * Draws the arena from the .wbt file as an SVG, either with the planned waypoint routes from
+ * {@link Routes} (the README map) or with paths actually driven in Webots (recorded by
+ * tools/webots/Observer.java), so the pictures come from the same data the controllers use.
  *
- * <p>Usage: {@code java MapRenderer worlds/ProjectWorld2025.wbt docs/images/mission-map.svg}
+ * <p>Usage:
+ * <pre>
+ *   java MapRenderer worlds/ProjectWorld2025.wbt docs/images/mission-map.svg
+ *   java MapRenderer worlds/ProjectWorld2025.wbt out.svg --path v1=run/v1/trajectory.csv --path v2=...
+ * </pre>
  */
 public class MapRenderer {
 
@@ -20,44 +27,71 @@ public class MapRenderer {
   private static final double MIN_Y = -260;
   private static final double MAX_Y = 1010;
   private static final double LEGEND_H = 230;
+  private static final String[] PATH_COLORS = {"#e8590c", "#1c7ed6", "#2b8a3e", "#ae3ec9"};
 
   private final StringBuilder svg = new StringBuilder();
 
   public static void main(String[] args) throws IOException {
     WorldFile world = WorldFile.read(Path.of(args[0]));
-    String out = new MapRenderer().render(world);
+    Map<String, List<Vec2>> paths = new LinkedHashMap<>();
+    for (int i = 2; i + 1 < args.length; i += 2) {
+      if (!args[i].equals("--path") || !args[i + 1].contains("=")) {
+        throw new IllegalArgumentException("expected --path name=trajectory.csv, got " + args[i]);
+      }
+      String[] spec = args[i + 1].split("=", 2);
+      paths.put(spec[0], readTrajectory(Path.of(spec[1])));
+    }
+    String out = paths.isEmpty()
+        ? new MapRenderer().render(world)
+        : new MapRenderer().renderPaths(world, paths);
     Files.write(Path.of(args[1]), out.getBytes(StandardCharsets.UTF_8));
   }
 
-  String render(WorldFile world) {
-    double w = MAX_X - MIN_X;
-    double h = MAX_Y - MIN_Y + LEGEND_H;
-    add("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 %.0f %.0f\" width=\"1000\" "
-        + "font-family=\"Helvetica, Arial, sans-serif\">", w, h);
-    add("<title>Jar collection mission map</title>");
-    add("<defs>");
-    for (String[] m : new String[][] {{"clear", "#d9480f"}, {"carry", "#1c7ed6"}, {"back", "#7048e8"},
-        {"bug", "#e03131"}}) {
-      add("<marker id=\"arrow-%s\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"5\" "
-          + "markerHeight=\"5\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" "
-          + "fill=\"%s\"/></marker>", m[0], m[1]);
+  /** Reads "t,x,y" rows (cm) written by the observer. */
+  static List<Vec2> readTrajectory(Path csv) throws IOException {
+    List<Vec2> points = new ArrayList<>();
+    for (String line : Files.readAllLines(csv, StandardCharsets.UTF_8)) {
+      String[] f = line.split(",");
+      if (f.length == 3 && !f[0].equals("t")) {
+        points.add(Vec2.of(Double.parseDouble(f[1]), Double.parseDouble(f[2])));
+      }
     }
-    add("<clipPath id=\"arena\"><rect x=\"0\" y=\"0\" width=\"%.0f\" height=\"%.0f\"/></clipPath>",
-        w, MAX_Y - MIN_Y);
-    add("</defs>");
-    add("<rect width=\"100%%\" height=\"100%%\" fill=\"#fbf8f2\"/>");
-    add("<g clip-path=\"url(#arena)\">");
-    add("<rect x=\"0\" y=\"0\" width=\"%.0f\" height=\"%.0f\" fill=\"#f1e6d2\"/>", w, MAX_Y - MIN_Y);
+    return points;
+  }
 
-    for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.CARDBOARD_BOX)) {
-      polygon(o.corners, "#e2c391", "#a07a3c", 2);
+  /** Paths driven in Webots, one colour per run, over the arena. */
+  String renderPaths(WorldFile world, Map<String, List<Vec2>> paths) {
+    open("Paths driven in Webots", new String[0][]);
+    drawObstacles(world);
+    int i = 0;
+    for (List<Vec2> path : paths.values()) {
+      StringBuilder pts = new StringBuilder();
+      for (Vec2 p : path) {
+        pts.append(String.format(Locale.ROOT, "%.1f,%.1f ", sx(p.x), sy(p.y)));
+      }
+      add("<polyline points=\"%s\" fill=\"none\" stroke=\"%s\" stroke-width=\"6\" "
+          + "stroke-opacity=\"0.75\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+          pts.toString().trim(), PATH_COLORS[i++ % PATH_COLORS.length]);
     }
-    for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.WOODEN_BOX)) {
-      polygon(o.corners, o.isDropoffPad() ? "#5c3d1e" : "#8a5a2b", "#3d2810", 2);
+    drawMarkers(world);
+    add("</g>");
+    double y = MAX_Y - MIN_Y + 60;
+    i = 0;
+    for (Map.Entry<String, List<Vec2>> e : paths.entrySet()) {
+      add("<line x1=\"30\" y1=\"%.0f\" x2=\"120\" y2=\"%.0f\" stroke=\"%s\" stroke-width=\"8\"/>",
+          y, y, PATH_COLORS[i++ % PATH_COLORS.length]);
+      add("<text x=\"140\" y=\"%.0f\" font-size=\"34\" fill=\"#212529\">%s</text>", y + 12, e.getKey());
+      y += 48;
     }
-    for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.WALL)) {
-      polygon(o.corners, o.blue ? "#1971c2" : "#495057", "none", 0);
-    }
+    obstacleLegend(1060, MAX_Y - MIN_Y + 60, "Cardboard box: pushable (start positions)");
+    add("</svg>");
+    return svg.toString();
+  }
+
+  String render(WorldFile world) {
+    open("Jar collection mission map", new String[][] {{"clear", "#d9480f"}, {"carry", "#1c7ed6"},
+        {"back", "#7048e8"}, {"bug", "#e03131"}});
+    drawObstacles(world);
 
     List<Vec2> clearing = new ArrayList<>();
     clearing.add(world.robotStart);
@@ -70,6 +104,51 @@ public class MapRenderer {
     route(Routes.DROPOFF_TO_SEARCH, "#7048e8", "back", "18 12", 5);
     route(List.of(Routes.SEARCH_POINT, Routes.DROPOFF_ENTRY), "#e03131", "bug", "6 14", 5);
 
+    drawMarkers(world);
+    label(-60, 470, "v1 retry after a failed search (jars 2-5): ", "#e03131", "middle");
+    label(-60, 430, "straight through 4 static boxes. Fixed in v2.", "#e03131", "middle");
+    add("</g>");
+
+    legend(MAX_Y - MIN_Y + 20);
+    add("</svg>");
+    return svg.toString();
+  }
+
+  /** SVG header, arrow markers, background, and the start of the clipped arena group. */
+  private void open(String title, String[][] markers) {
+    double w = MAX_X - MIN_X;
+    double h = MAX_Y - MIN_Y + LEGEND_H;
+    add("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 %.0f %.0f\" width=\"1000\" "
+        + "font-family=\"Helvetica, Arial, sans-serif\">", w, h);
+    add("<title>%s</title>", title);
+    add("<defs>");
+    for (String[] m : markers) {
+      add("<marker id=\"arrow-%s\" viewBox=\"0 0 10 10\" refX=\"8\" refY=\"5\" markerWidth=\"5\" "
+          + "markerHeight=\"5\" orient=\"auto-start-reverse\"><path d=\"M0,0 L10,5 L0,10 z\" "
+          + "fill=\"%s\"/></marker>", m[0], m[1]);
+    }
+    add("<clipPath id=\"arena\"><rect x=\"0\" y=\"0\" width=\"%.0f\" height=\"%.0f\"/></clipPath>",
+        w, MAX_Y - MIN_Y);
+    add("</defs>");
+    add("<rect width=\"100%%\" height=\"100%%\" fill=\"#fbf8f2\"/>");
+    add("<g clip-path=\"url(#arena)\">");
+    add("<rect x=\"0\" y=\"0\" width=\"%.0f\" height=\"%.0f\" fill=\"#f1e6d2\"/>", w, MAX_Y - MIN_Y);
+  }
+
+  private void drawObstacles(WorldFile world) {
+    for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.CARDBOARD_BOX)) {
+      polygon(o.corners, "#e2c391", "#a07a3c", 2);
+    }
+    for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.WOODEN_BOX)) {
+      polygon(o.corners, o.isDropoffPad() ? "#5c3d1e" : "#8a5a2b", "#3d2810", 2);
+    }
+    for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.WALL)) {
+      polygon(o.corners, o.blue ? "#1971c2" : "#495057", "none", 0);
+    }
+  }
+
+  /** Jars, start position, search point and place labels. */
+  private void drawMarkers(WorldFile world) {
     for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
       circle(o.center, 9, "#2f9e44", "#1b5e20");
     }
@@ -80,13 +159,6 @@ public class MapRenderer {
     label(Routes.SEARCH_POINT.x - 45, Routes.SEARCH_POINT.y - 45, "search point", "#212529", "end");
     label(905, -150, "jar bay", "#2b8a3e", "middle");
     label(-930, 760, "drop-off", "#5c3d1e", "start");
-    label(-60, 470, "v1 retry after a failed search (jars 2-5): ", "#e03131", "middle");
-    label(-60, 430, "straight through 4 static boxes. Fixed in v2.", "#e03131", "middle");
-    add("</g>");
-
-    legend(MAX_Y - MIN_Y + 20);
-    add("</svg>");
-    return svg.toString();
   }
 
   private void legend(double top) {
@@ -104,11 +176,13 @@ public class MapRenderer {
       add("<text x=\"%.0f\" y=\"%.0f\" font-size=\"34\" fill=\"#212529\">%s</text>", x + 110, y + 12, l[2]);
       y += 48;
     }
-    double x2 = 1060;
-    double y2 = top + 40;
+    obstacleLegend(1060, top + 40, "Cardboard box: pushable (start positions)");
+  }
+
+  private void obstacleLegend(double x2, double y2, String cardboardText) {
     swatch(x2, y2, "#495057", "Wall (blue = coloured panel)");
     swatch(x2, y2 + 48, "#8a5a2b", "Wooden box: static, cannot be pushed");
-    swatch(x2, y2 + 96, "#e2c391", "Cardboard box: pushable (start positions)");
+    swatch(x2, y2 + 96, "#e2c391", cardboardText);
     add("<circle cx=\"%.0f\" cy=\"%.0f\" r=\"11\" fill=\"#2f9e44\"/>", x2 + 20, y2 + 144);
     add("<text x=\"%.0f\" y=\"%.0f\" font-size=\"34\" fill=\"#212529\">Honey jar (5)</text>", x2 + 50, y2 + 156);
   }

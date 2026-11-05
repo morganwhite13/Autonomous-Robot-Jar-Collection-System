@@ -5,4 +5,6 @@ package com.cyberbotics.webots.controller;
 public class Supervisor extends Robot {
   public Supervisor() {}
   public Node getSelf() { throw new UnsupportedOperationException("Webots API stub"); }
+  public Node getFromDef(String name) { throw new UnsupportedOperationException("Webots API stub"); }
+  public void simulationQuit(int status) { throw new UnsupportedOperationException("Webots API stub"); }
 }

@@ -39,7 +39,7 @@ echo "==> Compiling v2 controller (warnings are errors)"
 
 echo "==> Compiling tests and tools"
 "${JAVAC[@]}" -Xlint:all -Werror -cp "$JUNIT_JAR:$WEBOTS_CP" -d "$BUILD/test" \
-  controllers/JarCollectorV2/*.java tools/*.java tests/*.java
+  controllers/JarCollectorV2/*.java tools/*.java tools/webots/*.java tests/*.java
 
 echo "==> Running tests"
 java -jar "$JUNIT_JAR" execute --class-path "$BUILD/test" --scan-class-path \

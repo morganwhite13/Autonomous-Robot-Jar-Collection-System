@@ -36,7 +36,7 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 46 JUnit tests, GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 51 JUnit tests, GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -140,11 +140,17 @@ The robot protos the world needs are included in `protos/`. They are reconstruct
    - `worlds/ProjectWorld2025_v2.wbt` for **v2** (same world, different controller).
 3. Press ▶. The console shows progress; v2 prefixes every line with the simulated time and ends with the mission report.
 
+### Compare v1 and v2 in Webots automatically
+```bash
+WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh      # macOS: WEBOTS_HOME=/Applications/Webots.app
+```
+This runs both worlds without a window (using `xvfb-run` on Linux) and judges them the same way. An invisible observer supervisor, added only to temporary copies of the worlds, records the robot's path and the moment each jar comes to rest at the drop-off. It ends each run when all five are delivered, or after an hour of simulated time. The script then writes `docs/webots-results.md` (jars delivered, mission time, distance driven, aborted approaches, failed searches, stalls) and `docs/images/webots-paths.svg` (both driven paths on the arena map). Add `--dry-run` to build and compile everything without launching Webots.
+
 ### Tests (no Webots needed)
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 46 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and the map above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 51 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and the map above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
@@ -165,6 +171,8 @@ protos/                        Pioneer 3-DX robot protos (reconstructed; see REA
 tests/                         JUnit tests, kinematic robot model, ports of v1 methods
 tools/
   run-tests.sh                 build + test + regenerate docs
+  run-in-webots.sh             run v1 and v2 headless in Webots and compare them
+  webots/                      observer supervisor used by run-in-webots.sh
   BeforeAfterBenchmark.java    v1 vs v2 measurements
   MapRenderer.java             draws docs/images/mission-map.svg
   WorldFile.java               reads obstacle footprints from the .wbt file
@@ -222,7 +230,7 @@ docs/
 ## 🔮 Future improvements
 
 ### Next, following on from v2
-1. Run both versions in Webots and put v2's mission report next to v1's run time
+1. Run both versions in Webots (`tools/run-in-webots.sh`) and publish the results
 2. Confirm the reconstructed robot protos load in Webots (or swap in the originals)
 3. Use the front sonars to detect obstacles, instead of only noticing a stall afterwards
 4. A real grab check, calibrated from the "camera now sees N green px" line v2 logs after each lift
