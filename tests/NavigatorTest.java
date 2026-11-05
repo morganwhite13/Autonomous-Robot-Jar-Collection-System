@@ -40,6 +40,15 @@ class NavigatorTest {
   }
 
   @Test
+  void turnGivesUpInsteadOfHangingWhenTheRobotCannotRotate() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0).withImperfections(0, 0.0);
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    assertEquals(false, new Navigator(robot, stats).turnTo(90, Config.MAX_SPEED));
+    assertEquals(Config.TURN_TIMEOUT_STEPS, robot.stepsTaken());
+    assertEquals(1, stats.turnTimeouts);
+  }
+
+  @Test
   void turnAcrossTheSeamGoesTheShortWay() {
     KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 350);
     assertTrue(nav(robot).turnTo(10, Config.MAX_SPEED));

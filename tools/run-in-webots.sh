@@ -50,7 +50,8 @@ done
 if [ -z "$CONTROLLER_JAR" ]; then
   if [ "$DRY_RUN" = 1 ]; then
     echo "==> Webots not found; dry run compiles controllers against the API stubs"
-    rm -rf build/stubs && javac --release 11 -d build/stubs $(find tools/webots-stubs -name '*.java')
+    rm -rf build/stubs
+    find tools/webots-stubs -name '*.java' -exec javac --release 11 -d build/stubs {} +
     CONTROLLER_JAR="build/stubs"
     WEBOTS_BIN="webots"
   else

@@ -28,6 +28,12 @@ class RoutesTest {
   }
 
   @Test
+  void routeLengthAddsUpTheLegsFromTheStart() {
+    assertEquals(80, Routes.length(Routes.SEARCH_POINT, Routes.TO_SEARCH_POINT), 1e-9);
+    assertEquals(0, Routes.length(Routes.SEARCH_POINT, List.of()), 1e-9);
+  }
+
+  @Test
   void worldFileHasTheExpectedContents() {
     assertEquals(20, world.ofKind(WorldFile.Kind.WALL).size());
     assertEquals(15, world.ofKind(WorldFile.Kind.WOODEN_BOX).size());

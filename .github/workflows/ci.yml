@@ -32,3 +32,10 @@ jobs:
       - name: Generated docs match the code
         if: matrix.java == '21'
         run: git diff --exit-code -- docs/benchmark-results.md docs/images/mission-map.svg docs/images/before-after.svg
+
+      - name: Webots comparison builds (dry run, no Webots needed)
+        run: tools/run-in-webots.sh --dry-run
+
+      - name: Lint shell scripts
+        if: matrix.java == '21'
+        run: shellcheck tools/*.sh
