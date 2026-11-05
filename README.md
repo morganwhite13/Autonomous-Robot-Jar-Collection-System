@@ -40,7 +40,7 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 59 JUnit tests, GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 61 JUnit tests covering 96% of v2's logic, GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -84,6 +84,36 @@ A pixel counts as jar green when `R < 120`, `G > 35` and `B < 120` (v1's thresho
 - **Approach steering**: if one third leads both others by more than 10 pixels, turn towards it (inner wheel ×0.3, outer ×1.2). If the centre leads, or there are more than 30 green pixels, go straight. Otherwise stop for 5 steps and look again.
 - **Give up** after 31 frames in a row with fewer than 15 green pixels.
 
+### Mission flow (v2)
+
+v1 had the same phases, but only implicitly, inside one long `main()`. v2 makes them explicit in [`Mission`](controllers/JarCollectorV2/Mission.java) and [`JarHandler`](controllers/JarCollectorV2/JarHandler.java), and every loop has an exit:
+
+```mermaid
+stateDiagram-v2
+    [*] --> StartUp
+    StartUp --> ClearPath
+    ClearPath --> ToSearchPoint
+    ToSearchPoint --> Search
+    Search --> CarryToDropoff: jar held
+    Search --> ToSearchPoint: search failed, fewer than 3 in a row
+    Search --> Report: 3 failed searches in a row
+    CarryToDropoff --> PlaceJar
+    PlaceJar --> ToSearchPoint: jars left, route from the drop-off
+    PlaceJar --> Report: all 5 delivered
+    Report --> [*]
+
+    state Search {
+        [*] --> Scan
+        Scan --> Wander: nothing seen
+        Wander --> Scan
+        Scan --> Approach: turn to best detection
+        Approach --> Grab: bumper pressed
+        Approach --> BackUp: jar lost or robot not moving
+        BackUp --> Scan
+        Grab --> [*]
+    }
+```
+
 ### Navigation (v2)
 
 Each leg turns in place towards the waypoint, then drives to it:
@@ -91,6 +121,25 @@ Each leg turns in place towards the waypoint, then drives to it:
 - **Drive:** full speed with a small proportional correction towards the waypoint, stopping once the robot has travelled the leg's length (v1's rule). If it moves less than 2 cm in 40 steps it reports a stall and continues with the next leg.
 
 ### v2 code structure
+
+Only `WebotsPlatform` talks to Webots. Everything else drives the robot through the `RobotPlatform` interface, which is what lets the tests swap in a simulated robot:
+
+```mermaid
+flowchart TB
+    Main["JarCollectorV2 (entry point)"] --> Logic
+    Main --> WP
+    subgraph Logic ["Mission logic: no Webots imports, unit-tested"]
+        Mission --> JarHandler
+        Mission --> Navigator
+        Mission --> Stats[MissionStats]
+        JarHandler --> Navigator
+        JarHandler --> Vision
+    end
+    Logic -- "drives the robot through" --> RP[["RobotPlatform (interface)"]]
+    WP[WebotsPlatform] -- implements --> RP
+    KR["KinematicRobot (tests)"] -- implements --> RP
+    WP --> API[(Webots API)]
+```
 
 | Class | Responsibility |
 |---|---|
@@ -155,11 +204,13 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 59 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 61 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
 ```
+
+Add `--coverage` to measure line coverage of the v2 controller with JaCoCo. It's currently 96% of the logic, and 83% overall, since `WebotsPlatform` and the entry point only run inside Webots. The HTML report lands in `build/coverage/index.html`.
 
 ---
 
