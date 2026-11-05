@@ -4,8 +4,11 @@
 #   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh            # both versions
 #   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh v2         # just one
 #   tools/run-in-webots.sh --dry-run                                # build everything, don't launch
+#   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh --watch v2 # watch it in real time
 #
 # Options: --limit SECONDS (simulated-time limit per run, default 3600)
+#          --watch         open the Webots window and run at real-time speed, e.g. to record a
+#                          demo video (needs a display; same observer, same results)
 #
 # Each run gets a temporary copy of the project under build/webots-run/<version>/. The copy's
 # world adds an invisible "observer" supervisor (tools/webots/Observer.java) that records the
@@ -21,11 +24,13 @@ cd "$(dirname "$0")/.."
 
 LIMIT=3600
 DRY_RUN=0
+WATCH=0
 VERSIONS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --limit) LIMIT="$2"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
+    --watch) WATCH=1; shift ;;
     v1|v2) VERSIONS+=("$1"); shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -63,7 +68,10 @@ fi
 CONTROLLER_JAR="$(cd "$(dirname "$CONTROLLER_JAR")" && pwd)/$(basename "$CONTROLLER_JAR")"
 
 LAUNCH=("$WEBOTS_BIN")
-if [ "$(uname)" = Linux ] && [ -z "${DISPLAY:-}" ]; then
+VIEW=(--mode=fast --no-rendering --minimize)
+if [ "$WATCH" = 1 ]; then
+  VIEW=(--mode=realtime)
+elif [ "$(uname)" = Linux ] && [ -z "${DISPLAY:-}" ]; then
   LAUNCH=(xvfb-run -a -s "-screen 0 1280x1024x24" "$WEBOTS_BIN")
 fi
 
@@ -104,7 +112,7 @@ for version in "${VERSIONS[@]}"; do
     (cd "$dir/controllers/$c" && javac -nowarn -encoding UTF-8 -cp "$CONTROLLER_JAR:." ./*.java)
   done
 
-  cmd=("${LAUNCH[@]}" --batch --mode=fast --no-rendering --stdout --stderr --minimize "$out_abs/worlds/$world")
+  cmd=("${LAUNCH[@]}" --batch "${VIEW[@]}" --stdout --stderr "$out_abs/worlds/$world")
   if [ "$DRY_RUN" = 1 ]; then
     echo "    would run: ${cmd[*]}"
     continue

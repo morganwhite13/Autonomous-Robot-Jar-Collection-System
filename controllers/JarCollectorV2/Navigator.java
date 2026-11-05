@@ -57,7 +57,8 @@ final class Navigator {
         robot.stop();
         return true;
       }
-      double speed = clamp(maxSpeed * Math.abs(error) / Config.TURN_SLOWDOWN_DEG, minSpeed, maxSpeed);
+      double speed =
+          clamp(maxSpeed * Math.abs(error) / Config.TURN_SLOWDOWN_DEG, minSpeed, maxSpeed);
       if (error > 0) {
         robot.drive(-speed, speed); // counter-clockwise (left)
       } else {

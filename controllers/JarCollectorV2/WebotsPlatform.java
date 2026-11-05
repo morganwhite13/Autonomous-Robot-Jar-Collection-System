@@ -140,7 +140,8 @@ final class WebotsPlatform implements RobotPlatform {
 
   @Override
   public String diagnostics() {
-    return String.format(Locale.ROOT, "sonar front L=%.0f R=%.0f, angled L=%.0f R=%.0f, side L=%.0f R=%.0f",
+    return String.format(Locale.ROOT,
+        "sonar front L=%.0f R=%.0f, angled L=%.0f R=%.0f, side L=%.0f R=%.0f",
         leftAhead.getValue(), rightAhead.getValue(), leftAngled.getValue(),
         rightAngled.getValue(), leftSide.getValue(), rightSide.getValue());
   }

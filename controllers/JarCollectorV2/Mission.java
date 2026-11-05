@@ -93,7 +93,8 @@ final class Mission {
     Log.phase("Start-up: opening and lowering gripper");
     robot.setFingers(Config.FINGERS_OPEN);
     robot.setLift(Config.LIFT_DOWN);
-    robot.waitSteps(Math.max(1, (int) Math.ceil((double) Config.STARTUP_SETTLE_MS / robot.timeStepMs())));
+    int settleSteps = (int) Math.ceil((double) Config.STARTUP_SETTLE_MS / robot.timeStepMs());
+    robot.waitSteps(Math.max(1, settleSteps));
     if (Config.PRINT_SENSOR_SELF_TEST) {
       robot.waitSteps(Config.SENSOR_SELF_TEST_STEPS);
       Log.info("Sensor self-test: " + robot.diagnostics());

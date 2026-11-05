@@ -52,8 +52,8 @@ final class JarHandler {
         wander();
         continue;
       }
-      Log.info(String.format(Locale.ROOT, "Best detection at %.0f deg: %d px %s (%s)", best.headingDeg,
-          best.counts.total(), best.counts, best.counts.dominant()));
+      Log.info(String.format(Locale.ROOT, "Best detection at %.0f deg: %d px %s (%s)",
+          best.headingDeg, best.counts.total(), best.counts, best.counts.dominant()));
       nav.turnTo(best.headingDeg, Config.MANOEUVRE_SPEED);
       stats.recordApproach();
       if (approachAndGrab()) {
@@ -98,7 +98,7 @@ final class JarHandler {
     return best;
   }
 
-  /** v1 carefullyApproachGreen: creep towards the jar, steering by which third of the image is greenest. */
+  /** v1 carefullyApproachGreen: creep forward, steering towards the greenest third of the image. */
   boolean approachAndGrab() {
     Log.info("Approaching jar");
     int stepsWithoutJar = 0;

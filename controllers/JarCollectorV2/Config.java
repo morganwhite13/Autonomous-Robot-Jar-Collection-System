@@ -29,12 +29,15 @@ final class Config {
   static final double HEADING_TOLERANCE_DEG = 3.0;
   /** new: turn at full speed above this error, then slow down proportionally. */
   static final double TURN_SLOWDOWN_DEG = 30.0;
-  /** new: slowest wheel speed used while finishing a turn. Set to MAX_SPEED for v1-style bang-bang turns. */
+  /**
+   * new: slowest wheel speed used while finishing a turn. Set to MAX_SPEED for v1-style
+   * bang-bang turns.
+   */
   static final double TURN_MIN_SPEED = 0.6;
-  /** new: a turn that has not converged after this many steps is abandoned (v1 could loop forever). */
+  /** new: abandon a turn that hasn't converged after this many steps (v1 could loop forever). */
   static final int TURN_TIMEOUT_STEPS = 400;
 
-  /** new: heading-hold gain while driving, wheel rad/s per degree of error. 0 = v1 open-loop driving. */
+  /** new: heading-hold gain while driving, wheel rad/s per degree of error. 0 = v1 open loop. */
   static final double HEADING_HOLD_GAIN = 0.1;
   /** new: cap on the heading-hold wheel-speed correction. */
   static final double HEADING_HOLD_MAX_CORRECTION = 1.0;
@@ -66,7 +69,7 @@ final class Config {
   static final int GREEN_DOMINANCE_MARGIN = 10;
   /** v1 EPSILON: a sector must lead the others by this many pixels to steer towards it. */
   static final int STEER_MARGIN_PIXELS = 10;
-  /** v1: drive straight when no sector clearly leads but at least this many green pixels are visible. */
+  /** v1: drive straight if no sector clearly leads but at least this many green pixels show. */
   static final int STEER_STRAIGHT_MIN_PIXELS = 30;
 
   // ------------------------------------------------------------------ search (360-degree scan)
@@ -74,7 +77,7 @@ final class Config {
   static final double SCAN_SPEED = MAX_SPEED / 4;
   /** v1: analyse a frame every 5 steps. */
   static final int SCAN_SAMPLE_EVERY_STEPS = 5;
-  /** new: stop after the compass says we turned this far (v1 used a fixed 200 steps, about 270 degrees). */
+  /** new: stop once the compass says we turned this far (v1: a fixed 200 steps, about 270 deg). */
   static final double SCAN_SWEEP_DEG = 370.0;
   static final int SCAN_TIMEOUT_STEPS = 600;
   /** v1: a frame counts as a detection with more than 20 green pixels. */

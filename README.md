@@ -29,7 +29,10 @@ This repository holds **two versions side by side**:
 
 ## ⚖️ Before and after at a glance
 
-![Bar and line charts comparing v1 and v2: the jar scan turns 271 degrees in v1 (188 with wheel slip) and 371 in v2; a 530 cm leg started 2.9 degrees off ends 26.8 cm from the waypoint in v1 and 1.1 cm in v2; after a failed search v1 drives 41.4 m and v2 0.8 m](docs/images/before-after.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/before-after-dark.svg">
+  <img alt="Bar and line charts comparing v1 and v2: the jar scan turns 271 degrees in v1 (188 with wheel slip) and 371 in v2; a 530 cm leg started 2.9 degrees off ends 26.8 cm from the waypoint in v1 and 1.1 cm in v2; after a failed search v1 drives 41.4 m and v2 0.8 m" src="docs/images/before-after.svg">
+</picture>
 
 | | v1 (before) | v2 (after) |
 |---|---|---|
@@ -40,7 +43,7 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 61 JUnit tests covering 96% of v2's logic, GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 61 JUnit tests covering 96% of v2's logic; SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -198,7 +201,7 @@ The robot protos the world needs are included in `protos/`. They are reconstruct
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh      # macOS: WEBOTS_HOME=/Applications/Webots.app
 ```
-This runs both worlds without a window (using `xvfb-run` on Linux) and judges them the same way. An invisible observer supervisor, added only to temporary copies of the worlds, records the robot's path and the moment each jar comes to rest at the drop-off. It ends each run when all five are delivered, or after an hour of simulated time. The script then writes `docs/webots-results.md` (jars delivered, mission time, distance driven, aborted approaches, failed searches, stalls) and `docs/images/webots-paths.svg` (both driven paths on the arena map). Add `--dry-run` to build and compile everything without launching Webots.
+This runs both worlds without a window (using `xvfb-run` on Linux) and judges them the same way. An invisible observer supervisor, added only to temporary copies of the worlds, records the robot's path and the moment each jar comes to rest at the drop-off. It ends each run when all five are delivered, or after an hour of simulated time. The script then writes `docs/webots-results.md` (jars delivered, mission time, distance driven, aborted approaches, failed searches, stalls) and `docs/images/webots-paths.svg` (both driven paths on the arena map). Add `--dry-run` to build and compile everything without launching Webots. Add `--watch v2` to open the Webots window and run at real-time speed instead, for example to record a new demo video.
 
 ### Tests (no Webots needed)
 ```bash
@@ -229,6 +232,7 @@ tools/
   run-tests.sh                 build + test + regenerate docs
   build-controllers.sh         compile both controllers so Webots can run them
   run-in-webots.sh             run v1 and v2 headless in Webots and compare them
+  static-analysis.sh           SpotBugs on both controllers (v2 must be clean)
   webots/                      observer supervisor used by run-in-webots.sh
   BeforeAfterBenchmark.java    v1 vs v2 measurements (ideal model, then with motor lag and wheel slip)
   BeforeAfterFigure.java       draws docs/images/before-after.svg

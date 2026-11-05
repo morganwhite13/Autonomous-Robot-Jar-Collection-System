@@ -28,7 +28,10 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 
 ## Measured on the kinematic model
 
-![v1 vs v2 on the same robot model: scan coverage, drift on a 530 cm leg, and distance driven after a failed search](images/before-after.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/before-after-dark.svg">
+  <img alt="v1 vs v2 on the same robot model: scan coverage, drift on a 530 cm leg, and distance driven after a failed search" src="images/before-after.svg">
+</picture>
 
 | Check | v1 (before) | v2 (after) |
 |---|---|---|
@@ -213,6 +216,7 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 | Dead code | `WORLD_WIDTH`/`WORLD_HEIGHT`, blue-pixel counting, `GreenDetection.greenLeft/Center/Right`, `moveHardcodedAhead`'s always-`false` return, the 400-step limit | Removed |
 | Telemetry | Progress messages without times | Every log line has the simulated time, and each run ends with a mission report: time per phase, per-jar scans and approaches, stalls, timeouts |
 | Tests | 0 | 61, covering 96% of v2's logic lines (83% including the two classes that only run inside Webots) |
+| Static analysis ([SpotBugs](https://spotbugs.github.io/), maximum effort, every priority) | 10 findings, all low severity: 5 unread fields, 3 `Math.floor` calls on constants, an int made via `nextDouble`, a field-naming slip | 0, enforced in CI (`tools/static-analysis.sh`) |
 
 ---
 

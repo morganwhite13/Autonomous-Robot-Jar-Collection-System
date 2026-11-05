@@ -28,7 +28,7 @@ final class Vec2 {
     return Math.hypot(other.x - x, other.y - y);
   }
 
-  /** Direction from this point to {@code other} in degrees [0, 360), i.e. atan2(dy, dx) as in v1. */
+  /** Direction from here to {@code other} in degrees [0, 360): atan2(dy, dx), as in v1. */
   double bearingTo(Vec2 other) {
     return Angles.normalize(Math.toDegrees(Math.atan2(other.y - y, other.x - x)));
   }
