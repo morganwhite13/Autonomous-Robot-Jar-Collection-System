@@ -14,7 +14,35 @@ import java.util.Locale;
  */
 public class WebotsSweepReport {
 
+  /**
+   * {@code java WebotsSweepReport --compare FIRST LAST LIMIT label=dir:version ...}: one column per
+   * sweep, for comparing settings run into separate folders.
+   */
   public static void main(String[] args) throws IOException {
+    if (args[0].equals("--compare")) {
+      int first = Integer.parseInt(args[1]);
+      int last = Integer.parseInt(args[2]);
+      List<String> labels = new ArrayList<>();
+      List<Integer> seeds = new ArrayList<>();
+      List<List<WebotsReport.Run>> runs = new ArrayList<>();
+      for (int seed = first; seed <= last; seed++) {
+        seeds.add(seed);
+        runs.add(new ArrayList<>());
+      }
+      for (int i = 4; i < args.length; i++) {
+        String label = args[i].substring(0, args[i].indexOf('='));
+        String dir = args[i].substring(args[i].indexOf('=') + 1, args[i].lastIndexOf(':'));
+        String version = args[i].substring(args[i].lastIndexOf(':') + 1);
+        labels.add(label);
+        for (int s = 0; s < seeds.size(); s++) {
+          Path runDir = Path.of(dir).resolve("seed-" + seeds.get(s)).resolve(version);
+          runs.get(s).add(Files.exists(runDir.resolve("result.properties"))
+              ? WebotsReport.load(runDir, version) : null);
+        }
+      }
+      System.out.print(markdown(seeds, labels, runs, args[3]));
+      return;
+    }
     Path root = Path.of(args[0]);
     int first = Integer.parseInt(args[1]);
     int last = Integer.parseInt(args[2]);

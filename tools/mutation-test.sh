@@ -48,7 +48,7 @@ JUNIT_JAR="$LIB/junit-platform-console-standalone-1.10.2.jar"
 LANG_JARS="$LIB/commons-text-1.10.0.jar,$LIB/commons-lang3-3.13.0.jar"
 
 TARGETS='Angles,Vec2,RgbImage,Vision,Vision$*,Navigator,Navigator$*,JarHandler,JarHandler$*'
-TARGETS="$TARGETS,Mission,MissionStats,MissionStats\$*,Routes,Routes\$*"
+TARGETS="$TARGETS,Mission,MissionStats,MissionStats\$*,Routes,Routes\$*,RoutePlanner,ArenaMap"
 
 echo "==> Mutation testing v2 (PIT); full output in build/pit.log"
 rm -rf build/pit
