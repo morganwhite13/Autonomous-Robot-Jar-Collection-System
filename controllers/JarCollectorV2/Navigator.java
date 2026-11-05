@@ -95,8 +95,14 @@ final class Navigator {
     boolean clean = true;
     for (Vec2 waypoint : waypoints) {
       DriveResult result = goTo(waypoint, travel);
-      if (result == DriveResult.STALLED && travel.detours && Config.DETOUR_AROUND_STALLS) {
-        result = detour(waypoint, travel);
+      if (travel.detours && Config.DETOUR_AROUND_STALLS) {
+        if (result == DriveResult.STALLED) {
+          result = detour(waypoint, travel, Config.DETOUR_BLOCKER_AHEAD_CM);
+        } else if (result == DriveResult.OBSTACLE_AHEAD) {
+          // The sonars say how far away it is: the blocker's near side is there.
+          result = detour(waypoint, travel, Config.FRONT_SONAR_AHEAD_CM + robot.frontObstacleCm()
+              + Config.DETOUR_BLOCKER_SIZE_CM / 2);
+        }
       }
       if (result == DriveResult.ABORTED) {
         return RouteResult.ABORTED;
@@ -122,15 +128,16 @@ final class Navigator {
   }
 
   /**
-   * The robot stalled on its way to {@code target}. Assume a {@link
-   * Config#DETOUR_BLOCKER_SIZE_CM} square just ahead of it is in the way, back off, plan around
-   * it and the static obstacles, and follow that. STALLED if there's no way round.
+   * The robot was stopped on its way to {@code target}. Assume a {@link
+   * Config#DETOUR_BLOCKER_SIZE_CM} square centred {@code blockerAheadCm} ahead of it is in the
+   * way, back off, plan around it and the static obstacles, and follow that. STALLED if there's
+   * no way round.
    */
-  private DriveResult detour(Vec2 target, Travel travel) {
+  private DriveResult detour(Vec2 target, Travel travel, double blockerAheadCm) {
     Vec2 here = robot.positionCm();
     double h = Math.toRadians(robot.headingDeg());
-    Vec2 ahead = Vec2.of(here.x + Config.DETOUR_BLOCKER_AHEAD_CM * Math.cos(h),
-        here.y + Config.DETOUR_BLOCKER_AHEAD_CM * Math.sin(h));
+    Vec2 ahead = Vec2.of(here.x + blockerAheadCm * Math.cos(h),
+        here.y + blockerAheadCm * Math.sin(h));
     double half = Config.DETOUR_BLOCKER_SIZE_CM / 2;
     Vec2[] blocker = {Vec2.of(ahead.x - half, ahead.y - half), Vec2.of(ahead.x + half, ahead.y - half),
         Vec2.of(ahead.x + half, ahead.y + half), Vec2.of(ahead.x - half, ahead.y + half)};

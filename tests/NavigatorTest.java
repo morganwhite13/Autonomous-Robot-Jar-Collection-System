@@ -319,4 +319,18 @@ class NavigatorTest {
     assertTrue(robot.positionCm().distanceTo(Vec2.of(850, 100)) < 5);
     assertEquals(0, stats.navigationProblems());
   }
+
+  @Test
+  void aSonarStopShortOfABoxIsFollowedByADetour() throws Exception {
+    KinematicRobot robot = carryLegWithBoxInTheWay();
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    Vec2 target = Vec2.of(350, 144);
+    assertEquals(Navigator.RouteResult.CLEAN, new Navigator(robot, stats)
+        .drive(List.of(target), new Navigator.Travel().watchAhead(true).detours(true)));
+    assertTrue(robot.positionCm().distanceTo(target) < 5, "ended at " + robot.positionCm());
+    assertEquals(1, stats.obstacleStops());
+    assertEquals(0, stats.driveStalls()); // it never touched the box
+    assertEquals(1, stats.detours());
+    assertTrue(Double.isNaN(robot.firstContactSpeedCmS), "touched the box");
+  }
 }
