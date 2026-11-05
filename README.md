@@ -43,7 +43,7 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 61 JUnit tests covering 96% of v2's logic; SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 66 JUnit tests covering 96% of v2's logic; SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -207,7 +207,7 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 61 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 66 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
@@ -237,12 +237,14 @@ tools/
   BeforeAfterBenchmark.java    v1 vs v2 measurements (ideal model, then with motor lag and wheel slip)
   BeforeAfterFigure.java       draws docs/images/before-after.svg
   MapRenderer.java             draws docs/images/mission-map.svg
+  RoutePlanner.java            A* planner used for docs/route-planner.md (analysis only)
   WorldFile.java               reads obstacle footprints from the .wbt file
   fetch-protos.sh              how the protos were rebuilt from Webots R2021b
   webots-stubs/                compile-only Webots API stubs for CI
 docs/
   BEFORE_AND_AFTER.md          the full comparison
   benchmark-results.md         generated measurements
+  route-planner.md             hand-tuned vs A* routes (generated)
   v1-original-README.md        the original README, unchanged
 ```
 
@@ -298,7 +300,7 @@ docs/
 4. A real grab check, calibrated from the "camera now sees N green px" line v2 logs after each lift
 
 ### Original roadmap
-5. **Dynamic pathfinding**: replace hardcoded waypoints with A* or Dijkstra (`tools/WorldFile.java` already extracts the obstacle footprints)
+5. **Dynamic pathfinding**: replace hardcoded waypoints with A* or Dijkstra. *Started:* [an A* analysis](docs/route-planner.md) finds routes about 14% shorter than the hand-tuned ones after the clearing phase, and shows there's no route at all without it
 6. **Obstacle mapping**: build a real-time obstacle map from the distance sensors
 7. **Machine learning**: train a CNN for robust detection in variable lighting
 8. **Configuration file**: externalise parameters. *Partly done: v2 gathers them all in `Config.java`*

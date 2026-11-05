@@ -3,6 +3,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -31,6 +33,8 @@ public class MapRenderer {
   private static final String[] PATH_COLORS = {"#eb6834", "#2a78d6", "#1baf7a", "#eda100"};
 
   private final StringBuilder svg = new StringBuilder();
+  /** Obstacles left out of the drawing (e.g. boxes assumed pushed aside). */
+  private Collection<WorldFile.Obstacle> hidden = Collections.emptyList();
 
   public static void main(String[] args) throws IOException {
     WorldFile world = WorldFile.read(Path.of(args[0]));
@@ -62,7 +66,15 @@ public class MapRenderer {
 
   /** Paths driven in Webots, one colour per run, over the arena. */
   String renderPaths(WorldFile world, Map<String, List<Vec2>> paths) {
-    open("Paths driven in Webots", new String[0][]);
+    return renderPaths(world, paths, Collections.emptyList(), "Paths driven in Webots",
+        "Cardboard box: pushable (start positions)");
+  }
+
+  /** Paths over the arena, leaving out {@code hiddenBoxes}, with the given title and box legend. */
+  String renderPaths(WorldFile world, Map<String, List<Vec2>> paths,
+      Collection<WorldFile.Obstacle> hiddenBoxes, String title, String cardboardLegend) {
+    hidden = hiddenBoxes;
+    open(title, new String[0][]);
     drawObstacles(world);
     int i = 0;
     for (List<Vec2> path : paths.values()) {
@@ -84,7 +96,7 @@ public class MapRenderer {
       add("<text x=\"140\" y=\"%.0f\" font-size=\"34\" fill=\"#212529\">%s</text>", y + 12, e.getKey());
       y += 48;
     }
-    obstacleLegend(1060, MAX_Y - MIN_Y + 60, "Cardboard box: pushable (start positions)");
+    obstacleLegend(1060, MAX_Y - MIN_Y + 60, cardboardLegend);
     add("</svg>");
     return svg.toString();
   }
@@ -138,6 +150,9 @@ public class MapRenderer {
 
   private void drawObstacles(WorldFile world) {
     for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.CARDBOARD_BOX)) {
+      if (hidden.contains(o)) {
+        continue;
+      }
       polygon(o.corners, "#e2c391", "#a07a3c", 2);
     }
     for (WorldFile.Obstacle o : world.ofKind(WorldFile.Kind.WOODEN_BOX)) {
