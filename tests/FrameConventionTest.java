@@ -1,6 +1,8 @@
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
@@ -62,5 +64,18 @@ class FrameConventionTest {
     assertTrue(world.robotStart.distanceTo(fromTranslation) < 1e-9);
     assertEquals(-815.65, world.robotStart.x, 1e-9);
     assertEquals(556.873, world.robotStart.y, 1e-9);
+  }
+
+  @Test
+  void robotProtosKeepTheirR2021bHeaderSoWebotsConvertsThem() throws Exception {
+    // The conventions above assume the robot as Webots R2021b defined it. Webots R2025a only
+    // converts the old cylinder axes and camera direction when the file says R2021b; with an
+    // R2025a header the wheels' collision cylinders lie across the wheels and the camera looks
+    // out of the robot's right side (protos/README.md).
+    for (String name : new String[] {"Pioneer3dx", "Pioneer3Gripper", "Pioneer3DistanceSensor"}) {
+      String first = Files.readAllLines(Path.of("protos", name + ".proto"), StandardCharsets.UTF_8)
+          .get(0);
+      assertEquals("#VRML_SIM R2021b utf8", first, name);
+    }
   }
 }

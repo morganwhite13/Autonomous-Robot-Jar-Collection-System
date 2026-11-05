@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Shows how the committed protos/*.proto files were made: download the Webots R2021b (NUE)
-# Pioneer 3-DX protos and update their headers for Webots R2025a. Existing files are left alone,
-# so delete protos/*.proto first to regenerate them. See protos/README.md.
+# Pioneer 3-DX protos and declare the one proto they use. The R2021b header stays: it is what
+# makes Webots R2025a convert the old cylinder and camera conventions (see protos/README.md).
+# Existing files are left alone, so delete protos/*.proto first to regenerate them.
 set -euo pipefail
 cd "$(dirname "$0")/../protos"
 
@@ -13,9 +14,10 @@ for name in Pioneer3dx Pioneer3Gripper Pioneer3DistanceSensor; do
   fi
   echo "Downloading $name.proto (Webots R2021b)"
   curl -fsSL --retry 3 "$BASE/$name.proto" -o "$name.proto.tmp"
-  # R2021b header -> R2025a header.
-  sed '1s/.*/#VRML_SIM R2025a utf8/' "$name.proto.tmp" > "$name.proto"
-  rm "$name.proto.tmp"
+  # Keep the header: changing it to R2025a switches off Webots' conversion of the old
+  # conventions, and the wheels and camera come out rotated.
+  head -1 "$name.proto.tmp" | grep -q '^#VRML_SIM R2021b' || { echo "unexpected header in $name.proto" >&2; exit 1; }
+  mv "$name.proto.tmp" "$name.proto"
 done
 
 # Since R2023a a proto must declare the protos it uses.
