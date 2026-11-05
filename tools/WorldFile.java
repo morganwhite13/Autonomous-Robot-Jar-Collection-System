@@ -101,7 +101,7 @@ final class WorldFile {
       blue |= line.startsWith("colorOverride 0 0 1");
     }
 
-    Vec2 center = Vec2.of(t[0] * 100, -t[2] * 100);
+    Vec2 center = Vec2.fromWorld(t);
     if (kind == Kind.ROBOT) {
       robotStart = center;
       return;

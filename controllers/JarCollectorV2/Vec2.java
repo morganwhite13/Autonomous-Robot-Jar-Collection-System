@@ -19,6 +19,11 @@ final class Vec2 {
     return new Vec2(x, y);
   }
 
+  /** Converts a Webots translation (metres, NUE: X, Y up, Z) into this frame. */
+  static Vec2 fromWorld(double[] translation) {
+    return new Vec2(translation[0] * 100, -translation[2] * 100);
+  }
+
   double distanceTo(Vec2 other) {
     return Math.hypot(other.x - x, other.y - y);
   }

@@ -1,3 +1,4 @@
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
@@ -28,11 +29,20 @@ final class KinematicRobot implements RobotPlatform {
   private double heading;
   private double leftSpeed;
   private double rightSpeed;
+  private double commandedLeft;
+  private double commandedRight;
+  private final ArrayDeque<double[]> pendingCommands = new ArrayDeque<>();
+  /** Steps before a wheel-speed command takes effect (0 = immediately). */
+  private int actuatorLagSteps;
+  /** Fraction of the ideal turn rate actually achieved (1 = no slip). */
+  private double turnEfficiency = 1.0;
   private long elapsedMs;
   private long steps;
   private long maxSteps = 500_000;
   /** Signed total rotation since construction (positive = counter-clockwise). */
   double cumulativeTurnDeg;
+  /** If set, the position after every step is appended (used to draw paths). */
+  List<Vec2> trace;
 
   final List<Vec2> jars = new ArrayList<>();
   final List<Vec2> deliveredJars = new ArrayList<>();
@@ -59,6 +69,16 @@ final class KinematicRobot implements RobotPlatform {
     return this;
   }
 
+  /**
+   * Makes the model less ideal: wheel commands take effect {@code lagSteps} steps late, and turns
+   * only achieve {@code turnEfficiency} of the ideal rate (wheel slip, castor drag).
+   */
+  KinematicRobot withImperfections(int lagSteps, double turnEfficiency) {
+    this.actuatorLagSteps = lagSteps;
+    this.turnEfficiency = turnEfficiency;
+    return this;
+  }
+
   long stepsTaken() {
     return steps;
   }
@@ -68,9 +88,15 @@ final class KinematicRobot implements RobotPlatform {
     if (steps >= maxSteps) {
       throw new SimulationEnded();
     }
+    pendingCommands.addLast(new double[] {commandedLeft, commandedRight});
+    if (pendingCommands.size() > actuatorLagSteps) {
+      double[] applied = pendingCommands.removeFirst();
+      leftSpeed = applied[0];
+      rightSpeed = applied[1];
+    }
     double dt = timeStepMs / 1000.0;
     double v = WHEEL_RADIUS_CM * (leftSpeed + rightSpeed) / 2;
-    double omega = WHEEL_RADIUS_CM * (rightSpeed - leftSpeed) / AXLE_TRACK_CM;
+    double omega = turnEfficiency * WHEEL_RADIUS_CM * (rightSpeed - leftSpeed) / AXLE_TRACK_CM;
     double mid = Math.toRadians(heading) + omega * dt / 2;
     Vec2 next = Vec2.of(x + v * dt * Math.cos(mid), y + v * dt * Math.sin(mid));
     if (!blocked.test(next)) {
@@ -79,6 +105,9 @@ final class KinematicRobot implements RobotPlatform {
     }
     heading = Angles.normalize(heading + Math.toDegrees(omega * dt));
     cumulativeTurnDeg += Math.toDegrees(omega * dt);
+    if (trace != null) {
+      trace.add(Vec2.of(x, y));
+    }
     steps++;
     elapsedMs += timeStepMs;
   }
@@ -95,8 +124,8 @@ final class KinematicRobot implements RobotPlatform {
 
   @Override
   public void drive(double left, double right) {
-    leftSpeed = left;
-    rightSpeed = right;
+    commandedLeft = left;
+    commandedRight = right;
   }
 
   @Override

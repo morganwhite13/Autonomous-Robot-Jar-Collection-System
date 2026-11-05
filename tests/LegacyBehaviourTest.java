@@ -19,6 +19,13 @@ class LegacyBehaviourTest {
   }
 
   @Test
+  void v1ScanCoversEvenLessWhenTheWheelsSlip() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0).withImperfections(2, 0.7);
+    LegacyV1.rotateAndFindGreen(robot);
+    assertTrue(robot.cumulativeTurnDeg < 200, "turned " + robot.cumulativeTurnDeg);
+  }
+
+  @Test
   void v1ScanMissesAJarJustRightOfItsStartingHeading() {
     KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
     double rad = Math.toRadians(-45);

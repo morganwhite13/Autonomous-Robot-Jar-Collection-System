@@ -33,6 +33,13 @@ class JarHandlerTest {
   }
 
   @Test
+  void scanStillTurnsAFullCircleWhenTheWheelsSlip() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 270).withImperfections(2, 0.5);
+    handler(robot).scan();
+    assertTrue(Math.abs(robot.cumulativeTurnDeg) >= 360, "turned " + robot.cumulativeTurnDeg);
+  }
+
+  @Test
   void scanFindsAJarThatV1sScanCannotSee() {
     KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
     robot.jars.add(polar(100, -45)); // just right of the starting heading

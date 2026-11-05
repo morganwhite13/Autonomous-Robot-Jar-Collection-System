@@ -33,7 +33,41 @@ public class BeforeAfterBenchmark {
     failedSearch(md, WorldFile.read(world));
     mission(md, WorldFile.read(world));
 
+    lagSteps = 2;
+    turnEfficiency = 0.7;
+    md.append("\n## With motor lag and wheel slip\n\n")
+        .append("The same checks on a less ideal robot: every wheel command takes effect ")
+        .append(lagSteps).append(" steps (").append(lagSteps * 32).append(" ms) late, and turns ")
+        .append("achieve only ").append(f0(turnEfficiency * 100)).append("% of the ideal rate. ")
+        .append("Neither version was tuned for these numbers.\n\n");
+    md.append("| Check | v1 (before) | v2 (after) |\n|---|---|---|\n");
+    turns(md);
+    scan(md);
+    drift(md);
+    imperfectMission(md, WorldFile.read(world));
+
     System.out.print(md);
+  }
+
+  /** Imperfections applied to every robot the checks create; 0 / 1.0 = the ideal model. */
+  private static int lagSteps = 0;
+  private static double turnEfficiency = 1.0;
+
+  private static KinematicRobot robot(Vec2 position, double headingDeg) {
+    return new KinematicRobot(position, headingDeg).withImperfections(lagSteps, turnEfficiency);
+  }
+
+  private static void imperfectMission(StringBuilder md, WorldFile world) {
+    KinematicRobot robot = robot(world.robotStart, 90);
+    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
+      robot.jars.add(jar.center);
+    }
+    Mission mission = new Mission(robot);
+    int delivered = mission.run();
+    MissionStats s = mission.stats();
+    row(md, "Whole mission in the model (no box physics)", "not ported",
+        delivered + "/5 jars, " + f0(robot.elapsedMs() / 1000.0) + " s simulated, "
+            + s.driveStalls + " stalls, " + s.turnTimeouts + " turn timeouts");
   }
 
   /** Every (start, target) heading pair on a grid; does the turn finish, and how fast? */
@@ -51,7 +85,7 @@ public class BeforeAfterBenchmark {
         double rad = Math.toRadians(target);
         Vec2 goal = Vec2.of(1000 * Math.cos(rad), 1000 * Math.sin(rad));
 
-        KinematicRobot r1 = new KinematicRobot(Vec2.of(0, 0), start);
+        KinematicRobot r1 = robot(Vec2.of(0, 0), start);
         int s1 = LegacyV1.makeHardcodedTurn(r1, 0, 0, goal.x, goal.y, 1000);
         if (s1 > 0) {
           v1Done++;
@@ -59,7 +93,7 @@ public class BeforeAfterBenchmark {
           v1MaxErr = Math.max(v1MaxErr, Math.abs(Angles.delta(r1.headingDeg(), Vec2.of(0, 0).bearingTo(goal))));
         }
 
-        KinematicRobot r2 = new KinematicRobot(Vec2.of(0, 0), start);
+        KinematicRobot r2 = robot(Vec2.of(0, 0), start);
         Navigator nav = new Navigator(r2, new MissionStats(r2::elapsedMs));
         if (nav.turnTo(Vec2.of(0, 0).bearingTo(goal), Config.MAX_SPEED)) {
           v2Done++;
@@ -77,16 +111,16 @@ public class BeforeAfterBenchmark {
   }
 
   private static void scan(StringBuilder md) {
-    KinematicRobot r1 = new KinematicRobot(Vec2.of(0, 0), 0);
+    KinematicRobot r1 = robot(Vec2.of(0, 0), 0);
     LegacyV1.rotateAndFindGreen(r1);
-    KinematicRobot r2 = new KinematicRobot(Vec2.of(0, 0), 0);
+    KinematicRobot r2 = robot(Vec2.of(0, 0), 0);
     handler(r2).scan();
     row(md, "360-degree jar scan: rotation actually covered",
         f0(r1.cumulativeTurnDeg) + " deg", f0(r2.cumulativeTurnDeg) + " deg");
 
-    KinematicRobot b1 = new KinematicRobot(Vec2.of(0, 0), 0);
+    KinematicRobot b1 = robot(Vec2.of(0, 0), 0);
     b1.jars.add(Vec2.of(100 * Math.cos(Math.toRadians(-45)), 100 * Math.sin(Math.toRadians(-45))));
-    KinematicRobot b2 = new KinematicRobot(Vec2.of(0, 0), 0);
+    KinematicRobot b2 = robot(Vec2.of(0, 0), 0);
     b2.jars.addAll(b1.jars);
     row(md, "Scan finds a jar 1 m away, 45 deg right of the starting heading",
         LegacyV1.rotateAndFindGreen(b1) == null ? "no (blind spot)" : "yes",
@@ -96,19 +130,19 @@ public class BeforeAfterBenchmark {
   /** Longest leg in the routes (530 cm) started 2.9 deg off, which the +/-3 deg turn tolerance allows. */
   private static void drift(StringBuilder md) {
     Vec2 target = Vec2.of(530, 0);
-    KinematicRobot r1 = new KinematicRobot(Vec2.of(0, 0), 2.9);
+    KinematicRobot r1 = robot(Vec2.of(0, 0), 2.9);
     LegacyV1.moveHardcodedAhead(r1, 0, 0, target.x, target.y, 10_000);
-    KinematicRobot r2 = new KinematicRobot(Vec2.of(0, 0), 2.9);
+    KinematicRobot r2 = robot(Vec2.of(0, 0), 2.9);
     new Navigator(r2, new MissionStats(r2::elapsedMs)).driveTo(target);
     row(md, "530 cm leg starting 2.9 deg off: distance from waypoint at the end",
         f1(r1.positionCm().distanceTo(target)) + " cm", f1(r2.positionCm().distanceTo(target)) + " cm");
   }
 
   private static void blocked(StringBuilder md) {
-    KinematicRobot r1 = new KinematicRobot(Vec2.of(0, 0), 0);
+    KinematicRobot r1 = robot(Vec2.of(0, 0), 0);
     r1.blocked = p -> p.x > 100;
     int s1 = LegacyV1.moveHardcodedAhead(r1, 0, 0, 300, 0, 20_000);
-    KinematicRobot r2 = new KinematicRobot(Vec2.of(0, 0), 0);
+    KinematicRobot r2 = robot(Vec2.of(0, 0), 0);
     r2.blocked = p -> p.x > 100;
     Navigator.DriveResult result = new Navigator(r2, new MissionStats(r2::elapsedMs)).driveTo(Vec2.of(300, 0));
     row(md, "Drive blocked by an immovable obstacle after 1 m",
@@ -123,7 +157,7 @@ public class BeforeAfterBenchmark {
     row(md, "Longest straight approach before the time limit aborts it",
         f0(v1Reach) + " cm (300 steps)", f0(v2Reach) + " cm cap; aborts early only if not moving");
 
-    KinematicRobot r2 = new KinematicRobot(Vec2.of(0, 0), 0);
+    KinematicRobot r2 = robot(Vec2.of(0, 0), 0);
     r2.jars.add(Vec2.of(150, 0));
     boolean v2Grabbed = handler(r2).approachAndGrab();
     row(md, "Approach and grab a jar 1.5 m ahead in one attempt",
@@ -148,7 +182,7 @@ public class BeforeAfterBenchmark {
   }
 
   private static void mission(StringBuilder md, WorldFile world) {
-    KinematicRobot robot = new KinematicRobot(world.robotStart, 90); // facing +y, as in the world
+    KinematicRobot robot = robot(world.robotStart, 90); // facing +y, as in the world
     for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
       robot.jars.add(jar.center);
     }

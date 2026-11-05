@@ -44,6 +44,12 @@ class MissionTest {
   }
 
   @Test
+  void stillDeliversAllJarsWithMotorLagAndWheelSlip() {
+    KinematicRobot robot = robotWithJars().withImperfections(2, 0.7);
+    assertEquals(5, new Mission(robot).run());
+  }
+
+  @Test
   void identicalRunsGiveIdenticalReports() {
     List<String> logs = new ArrayList<>();
     for (int run = 0; run < 2; run++) {

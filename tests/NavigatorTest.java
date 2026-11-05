@@ -29,6 +29,17 @@ class NavigatorTest {
   }
 
   @Test
+  void turnStillFinishesWithMotorLagAndWheelSlip() {
+    for (int start = 0; start < 360; start += 13) {
+      for (int target = 0; target < 360; target += 17) {
+        KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), start).withImperfections(3, 0.6);
+        assertTrue(nav(robot).turnTo(target, Config.MAX_SPEED), start + " -> " + target);
+        assertTrue(Angles.within(robot.headingDeg(), target, Config.HEADING_TOLERANCE_DEG + 2));
+      }
+    }
+  }
+
+  @Test
   void turnAcrossTheSeamGoesTheShortWay() {
     KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 350);
     assertTrue(nav(robot).turnTo(10, Config.MAX_SPEED));

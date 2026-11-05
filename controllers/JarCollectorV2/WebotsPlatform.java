@@ -99,8 +99,7 @@ final class WebotsPlatform implements RobotPlatform {
 
   @Override
   public Vec2 positionCm() {
-    double[] t = translation.getSFVec3f();
-    return new Vec2(t[0] * 100, -t[2] * 100);
+    return Vec2.fromWorld(translation.getSFVec3f());
   }
 
   @Override
