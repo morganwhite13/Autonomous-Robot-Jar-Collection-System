@@ -28,17 +28,50 @@ public class WebotsReport {
           "WARNING: drive to", "WARNING: turn to"},
   };
 
+  /** A run that ends this close to where it has been for the last two minutes counts as stuck. */
+  static final double STUCK_RADIUS_CM = 10;
+  static final double STUCK_MIN_S = 120;
+
   static final class Run {
     final String name;
     final Properties result;
     final List<Vec2> path;
+    /** Simulated time of each point in {@link #path}, in seconds. */
+    final List<Double> times;
     final List<String> log;
 
-    Run(String name, Properties result, List<Vec2> path, List<String> log) {
+    Run(String name, Properties result, List<Vec2> path, List<Double> times, List<String> log) {
       this.name = name;
       this.result = result;
       this.path = path;
+      this.times = times;
       this.log = log;
+    }
+
+    /**
+     * Jars the controller itself says it delivered: both print "Jars remaining: N" once per jar
+     * they think they placed. v1 never checks that it is holding anything.
+     */
+    long claimed() {
+      return count("Jars remaining: ");
+    }
+
+    /**
+     * For a run that was stopped at the time limit: when the robot came to rest within
+     * {@link #STUCK_RADIUS_CM} of where it ended, if that was at least {@link #STUCK_MIN_S} before
+     * the end. NaN otherwise.
+     */
+    double stuckFromS() {
+      if (!Boolean.parseBoolean(result.getProperty("timeLimitHit", "false")) || path.isEmpty()) {
+        return Double.NaN;
+      }
+      Vec2 end = path.get(path.size() - 1);
+      int i = path.size() - 1;
+      while (i > 0 && path.get(i - 1).distanceTo(end) <= STUCK_RADIUS_CM) {
+        i--;
+      }
+      double from = times.get(i);
+      return times.get(times.size() - 1) - from >= STUCK_MIN_S ? from : Double.NaN;
     }
 
     int delivered() {
@@ -91,12 +124,22 @@ public class WebotsReport {
       result.load(new StringReader(Files.readString(resultFile, StandardCharsets.UTF_8)));
     }
     Path csv = dir.resolve("trajectory.csv");
-    List<Vec2> path = Files.exists(csv) ? MapRenderer.readTrajectory(csv) : Collections.emptyList();
+    List<Vec2> path = new ArrayList<>();
+    List<Double> times = new ArrayList<>();
+    if (Files.exists(csv)) {
+      for (String line : Files.readAllLines(csv, StandardCharsets.UTF_8)) {
+        String[] f = line.split(",");
+        if (f.length == 3 && !f[0].equals("t")) {
+          times.add(Double.parseDouble(f[0]));
+          path.add(Vec2.of(Double.parseDouble(f[1]), Double.parseDouble(f[2])));
+        }
+      }
+    }
     Path logFile = dir.resolve("webots.log");
     List<String> log = Files.exists(logFile)
         ? Files.readAllLines(logFile, StandardCharsets.ISO_8859_1)
         : Collections.emptyList();
-    return new Run(name, result, path, log);
+    return new Run(name, result, path, times, log);
   }
 
   static double distanceM(List<Vec2> path) {
@@ -120,6 +163,7 @@ public class WebotsReport {
     md.append('\n');
 
     row(md, runs, "Jars delivered", r -> r.delivered() + "/" + r.jars());
+    row(md, runs, "Jars the controller says it delivered", r -> Long.toString(r.claimed()));
     row(md, runs, "Mission time (last jar delivered)", r -> r.delivered() == r.jars() && r.jars() > 0
         ? minutes(r.deliveryTimes().get(r.deliveryTimes().size() - 1))
         : "did not finish (stopped at " + minutes(r.simTime()) + ")");
@@ -130,6 +174,8 @@ public class WebotsReport {
       }
       return s.length() == 0 ? "-" : s.toString();
     });
+    row(md, runs, "Stuck in one place from", r -> Double.isNaN(r.stuckFromS())
+        ? "-" : String.format(Locale.ROOT, "%.0f s to the end", r.stuckFromS()));
     row(md, runs, "Distance driven", r -> String.format(Locale.ROOT, "%.0f m", distanceM(r.path)));
     row(md, runs, "Jars knocked out of the drop-off lane afterwards",
         r -> r.result.getProperty("disturbances", "-"));
