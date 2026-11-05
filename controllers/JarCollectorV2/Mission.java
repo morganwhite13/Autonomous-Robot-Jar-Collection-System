@@ -1,4 +1,5 @@
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 
 /**
@@ -109,7 +110,9 @@ final class Mission {
       }
       failedInARow = 0;
 
-      deliver(delivered);
+      if (!deliver(delivered)) {
+        continue; // dropped on the way: back at the search point for another try
+      }
       atDropoff = true;
       delivered++;
       Log.info("Jars remaining: " + (Config.JAR_COUNT - delivered));
@@ -129,7 +132,7 @@ final class Mission {
   private void goToSearchPoint(boolean fromDropoff) {
     stats.beginPhase(PHASE_TO_SEARCH);
     List<Vec2> route = fromDropoff ? routes.dropoffToSearch : Routes.TO_SEARCH_POINT;
-    nav.followRoute(route, options.sonarWatch);
+    nav.drive(route, new Navigator.Travel().watchAhead(options.sonarWatch).detours(true));
   }
 
   private boolean searchAndGrab() {
@@ -141,13 +144,37 @@ final class Mission {
     return false;
   }
 
-  /** Carries the held jar to the drop-off and places it in slot {@code jarIndex}. */
-  private void deliver(int jarIndex) {
+  /**
+   * Carries the held jar to the drop-off and places it in slot {@code jarIndex}. If the jar falls
+   * out on the way, goes back to the search point instead and returns false.
+   */
+  private boolean deliver(int jarIndex) {
     stats.beginPhase(PHASE_TO_DROPOFF);
-    nav.followRoute(routes.searchToDropoff, options.sonarWatch, Config.CARRY_TURN_SPEED);
-    stats.beginPhase(PHASE_PLACE);
-    jars.place(jarIndex);
+    JarHandler.GripWatch holding = jars.gripWatch();
+    Navigator.Travel carry = new Navigator.Travel().watchAhead(options.sonarWatch)
+        .turnSpeed(Config.CARRY_TURN_SPEED).detours(true).keepGoingWhile(holding);
+    boolean delivered = nav.drive(routes.searchToDropoff, carry) != Navigator.RouteResult.ABORTED;
+    if (delivered) {
+      stats.beginPhase(PHASE_PLACE);
+      delivered = jars.place(jarIndex, holding);
+    }
+    if (!Double.isNaN(holding.lowest())) {
+      Log.info(String.format(Locale.ROOT, "Lowest grip effort while carrying: %.2f",
+          holding.lowest()));
+    }
+    if (!delivered) {
+      stats.recordDroppedJar();
+      Log.warn("the jar fell out of the gripper at " + robot.positionCm()
+          + "; going back to the search point");
+      robot.setFingers(Config.FINGERS_OPEN);
+      robot.setLift(Config.LIFT_DOWN);
+      stats.beginPhase(PHASE_TO_SEARCH);
+      nav.driveViaPlan(Routes.TO_SEARCH_POINT.get(0),
+          new Navigator.Travel().watchAhead(options.sonarWatch).detours(true));
+      return false;
+    }
     stats.jarDelivered();
+    return true;
   }
 
   private void finish(int delivered) {

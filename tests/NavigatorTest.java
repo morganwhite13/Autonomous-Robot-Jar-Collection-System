@@ -263,4 +263,60 @@ class NavigatorTest {
     KinematicRobot wall = new KinematicRobot(Vec2.of(0, 0), 0).withBox(Vec2.of(0, 1030), 1000);
     assertEquals(Double.POSITIVE_INFINITY, wall.frontObstacleCm());
   }
+
+  /** The long carry leg from the jar bay, with a 40 cm box dropped in the middle of it. */
+  private static KinematicRobot carryLegWithBoxInTheWay() throws Exception {
+    WorldFile world = WorldFile.read(java.nio.file.Path.of("worlds/ProjectWorld2025.wbt"));
+    Vec2 start = Vec2.of(850, 100);
+    return new KinematicRobot(start, start.bearingTo(Vec2.of(350, 144)))
+        .withStaticObstacles(world, KinematicRobot.ROBOT_RADIUS_CM)
+        .withBox(Vec2.of(600, 122), 20);
+  }
+
+  @Test
+  void aStalledLegPlansAWayAroundWhatStoppedIt() throws Exception {
+    KinematicRobot robot = carryLegWithBoxInTheWay();
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    Vec2 target = Vec2.of(350, 144);
+    assertEquals(Navigator.RouteResult.CLEAN, new Navigator(robot, stats)
+        .drive(List.of(target), new Navigator.Travel().detours(true)));
+    assertTrue(robot.positionCm().distanceTo(target) < 5, "ended at " + robot.positionCm());
+    assertEquals(1, stats.driveStalls());
+    assertEquals(1, stats.detours());
+  }
+
+  @Test
+  void withoutDetoursAStalledLegIsSkipped() throws Exception {
+    KinematicRobot robot = carryLegWithBoxInTheWay();
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    assertEquals(Navigator.RouteResult.WITH_PROBLEMS, new Navigator(robot, stats)
+        .drive(List.of(Vec2.of(350, 144)), new Navigator.Travel()));
+    assertTrue(robot.positionCm().x > 600, "stopped at the box, at " + robot.positionCm());
+    assertEquals(0, stats.detours());
+  }
+
+  @Test
+  void aRouteIsAbandonedAsSoonAsItsConditionFails() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    int[] checks = {0};
+    Navigator.RouteResult result = nav(robot).drive(List.of(Vec2.of(300, 0), Vec2.of(300, 300)),
+        new Navigator.Travel().keepGoingWhile(() -> ++checks[0] < 50));
+    assertEquals(Navigator.RouteResult.ABORTED, result);
+    assertTrue(robot.isStopped());
+    assertTrue(robot.positionCm().x < 300 && robot.positionCm().y == 0, "at " + robot.positionCm());
+  }
+
+  @Test
+  void aRouteFromAnywhereIsPlannedAroundTheWalls() throws Exception {
+    // From the drop-off end of the carry route back to the jar bay: a straight line would cross
+    // wooden boxes; the planned one doesn't, so it arrives without stalling.
+    WorldFile world = WorldFile.read(java.nio.file.Path.of("worlds/ProjectWorld2025.wbt"));
+    KinematicRobot robot = new KinematicRobot(Vec2.of(-590, 450), 0)
+        .withStaticObstacles(world, KinematicRobot.ROBOT_RADIUS_CM).withStepLimit(100_000);
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    assertEquals(Navigator.RouteResult.CLEAN,
+        new Navigator(robot, stats).driveViaPlan(Vec2.of(850, 100), new Navigator.Travel()));
+    assertTrue(robot.positionCm().distanceTo(Vec2.of(850, 100)) < 5);
+    assertEquals(0, stats.navigationProblems());
+  }
 }

@@ -1,5 +1,6 @@
 import java.util.Locale;
 import java.util.Random;
+import java.util.function.BooleanSupplier;
 
 /**
  * Finding, grabbing and placing jars. The algorithm is v1's (scan, turn to best detection,
@@ -235,14 +236,60 @@ final class JarHandler {
     return true;
   }
 
+  /**
+   * Watches the finger force while a jar is carried ({@link Config#WATCH_GRIP_WHILE_CARRYING}):
+   * false once it has stayed below {@link Config#GRIP_EFFORT_HOLDING} for {@link
+   * Config#DROP_CONFIRM_STEPS} checks in a row. A platform that can't measure it (NaN) counts as
+   * holding.
+   */
+  final class GripWatch implements BooleanSupplier {
+    private int lowFor;
+    private double lowest = Double.NaN;
+
+    @Override
+    public boolean getAsBoolean() {
+      if (!Config.WATCH_GRIP_WHILE_CARRYING) {
+        return true;
+      }
+      double effort = robot.gripEffort();
+      if (!(effort >= lowest)) { // also true while lowest is NaN
+        lowest = Double.isNaN(effort) ? lowest : effort;
+      }
+      lowFor = effort < Config.GRIP_EFFORT_HOLDING ? lowFor + 1 : 0;
+      return lowFor < Config.DROP_CONFIRM_STEPS;
+    }
+
+    /** The lowest grip effort seen so far, or NaN if none was measured. */
+    double lowest() {
+      return lowest;
+    }
+  }
+
+  GripWatch gripWatch() {
+    return new GripWatch();
+  }
+
   /** v1 placeJar: drive into the slot for this jar, open and lower the gripper, back out. */
   void place(int jarIndex) {
+    place(jarIndex, () -> true);
+  }
+
+  /**
+   * As {@link #place(int)}, but returns false, without backing out, if {@code holding} reports
+   * the jar gone on the way to the slot.
+   */
+  boolean place(int jarIndex, BooleanSupplier holding) {
     Log.info("Placing jar in slot " + (jarIndex + 1) + " (y=" + Routes.slotY(jarIndex) + ")");
-    nav.followRoute(Routes.placementPath(jarIndex), false, Config.CARRY_TURN_SPEED);
+    Navigator.RouteResult result = nav.drive(Routes.placementPath(jarIndex),
+        new Navigator.Travel().turnSpeed(Config.CARRY_TURN_SPEED).keepGoingWhile(holding));
     robot.setFingers(Config.FINGERS_OPEN);
     robot.setLift(Config.LIFT_DOWN);
     robot.waitSteps(Config.RELEASE_STEPS);
+    if (result == Navigator.RouteResult.ABORTED) {
+      return false;
+    }
     nav.driveSteps(-Config.MANOEUVRE_SPEED, Config.BACKUP_AFTER_RELEASE_STEPS);
+    return true;
   }
 
   /** v1 moveRandomly: turn by a random angle in [-90, 90), then drive forward briefly. */

@@ -64,6 +64,8 @@ final class KinematicRobot implements RobotPlatform {
    * throws the jar within 0.6 s; 2.5 and 1.67 rad/s keep it.
    */
   double throwsJarAboveTurnSpeed = Double.POSITIVE_INFINITY;
+  /** How many jars may be thrown that way before the gripper starts holding on. */
+  int jarsToThrow = Integer.MAX_VALUE;
   /** Where thrown jars landed. They land on their side, so they can't be grabbed again. */
   final List<Vec2> thrownJars = new ArrayList<>();
   double fingers = Config.FINGERS_OPEN;
@@ -143,8 +145,9 @@ final class KinematicRobot implements RobotPlatform {
       leftSpeed = applied[0];
       rightSpeed = applied[1];
     }
-    if (heldJar != null && leftSpeed * rightSpeed < 0
+    if (heldJar != null && jarsToThrow > 0 && leftSpeed * rightSpeed < 0
         && Math.min(Math.abs(leftSpeed), Math.abs(rightSpeed)) > throwsJarAboveTurnSpeed) {
+      jarsToThrow--;
       double h = Math.toRadians(heading);
       thrownJars.add(Vec2.of(x + TOUCH_DISTANCE_CM * Math.cos(h), y + TOUCH_DISTANCE_CM * Math.sin(h)));
       heldJar = null;

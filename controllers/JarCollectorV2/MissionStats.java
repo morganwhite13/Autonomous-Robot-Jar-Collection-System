@@ -40,6 +40,8 @@ final class MissionStats {
   private int failedSearches;
   private int missedGrabs;
   private int obstacleStops;
+  private int droppedJars;
+  private int detours;
 
   MissionStats(LongSupplier clockMs) {
     this.clockMs = clockMs;
@@ -88,6 +90,14 @@ final class MissionStats {
     missedGrabs++;
   }
 
+  void recordDroppedJar() {
+    droppedJars++;
+  }
+
+  void recordDetour() {
+    detours++;
+  }
+
   void recordObstacleStop() {
     obstacleStops++;
   }
@@ -126,6 +136,14 @@ final class MissionStats {
   }
 
   /** Legs the sonar watch cut short because something was in the way. */
+  int droppedJars() {
+    return droppedJars;
+  }
+
+  int detours() {
+    return detours;
+  }
+
   int obstacleStops() {
     return obstacleStops;
   }
@@ -185,8 +203,9 @@ final class MissionStats {
     }
     sb.append(String.format(Locale.ROOT,
         "%nAnomalies: drive stalls=%d, drive timeouts=%d, turn timeouts=%d, failed searches=%d, "
-            + "missed grabs=%d, sonar stops=%d%n",
-        driveStalls, driveTimeouts, turnTimeouts, failedSearches, missedGrabs, obstacleStops));
+            + "missed grabs=%d, sonar stops=%d, dropped jars=%d, detours=%d%n",
+        driveStalls, driveTimeouts, turnTimeouts, failedSearches, missedGrabs, obstacleStops,
+        droppedJars, detours));
     sb.append("==============================================================");
     return sb.toString();
   }

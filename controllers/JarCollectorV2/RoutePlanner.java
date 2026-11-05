@@ -94,6 +94,35 @@ final class RoutePlanner {
     return p.distanceTo(Vec2.of(a.x + t * dx, a.y + t * dy));
   }
 
+  /**
+   * The centre of the free cell nearest to {@code p}, searching outwards up to {@code maxCm};
+   * {@code p} itself if its cell is free, or null if none is that close.
+   */
+  Vec2 nearestFree(Vec2 p, double maxCm) {
+    if (isFree(p)) {
+      return p;
+    }
+    int c0 = col(p.x);
+    int r0 = row(p.y);
+    int reach = (int) Math.ceil(maxCm / cell);
+    Vec2 best = null;
+    double bestDistance = maxCm;
+    for (int r = r0 - reach; r <= r0 + reach; r++) {
+      for (int c = c0 - reach; c <= c0 + reach; c++) {
+        if (c < 0 || r < 0 || c >= cols || r >= rows || blocked[r * cols + c]) {
+          continue;
+        }
+        Vec2 centre = centre(c, r);
+        double d = centre.distanceTo(p);
+        if (d <= bestDistance) {
+          bestDistance = d;
+          best = centre;
+        }
+      }
+    }
+    return best;
+  }
+
   boolean isFree(Vec2 p) {
     int c = col(p.x);
     int r = row(p.y);

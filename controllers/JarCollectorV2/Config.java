@@ -170,4 +170,29 @@ final class Config {
    * close on nothing reach their target and stop pushing (about 0).
    */
   static final double GRIP_EFFORT_HOLDING = 0.5;
+
+  // ------------------------------------------------------------------ carrying (new)
+  /**
+   * new: while carrying a jar, watch the finger force. If it stays below GRIP_EFFORT_HOLDING for
+   * DROP_CONFIRM_STEPS steps in a row, the jar has fallen out: v2 stops, goes back to the search
+   * point and carries on with the next jar. v1 drove on to the drop-off empty-handed and counted
+   * the delivery. Set to false for v1 behaviour.
+   */
+  static final boolean WATCH_GRIP_WHILE_CARRYING = true;
+  static final int DROP_CONFIRM_STEPS = 5;
+  // ------------------------------------------------------------------ detours (new)
+  /**
+   * new: when a leg of a travel route stalls (not the box-clearing route, which is meant to push
+   * boxes), v2 treats a square just ahead of it as an obstacle, backs off, plans a way around on
+   * {@link ArenaMap} with A*, and follows that. If there's no way, it skips to the next waypoint
+   * as before. v1 pushed forever. Set to false to only skip.
+   */
+  static final boolean DETOUR_AROUND_STALLS = true;
+  /** new: the assumed obstacle: a square this wide, centred this far ahead of the robot. */
+  static final double DETOUR_BLOCKER_SIZE_CM = 40;
+  static final double DETOUR_BLOCKER_AHEAD_CM = 35;
+  /** new: back off this long (at MANOEUVRE_SPEED) before following the detour. */
+  static final int DETOUR_BACKUP_STEPS = 25;
+  /** new: how far from the robot (or a waypoint near a wall) to look for open floor to plan from. */
+  static final double DETOUR_FIND_FREE_CM = 80;
 }

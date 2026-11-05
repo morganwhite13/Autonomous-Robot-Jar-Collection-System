@@ -56,13 +56,19 @@ public class WebotsReport {
       return count("Jars remaining: ");
     }
 
+    /** True if the controller ended its mission itself (v2 prints a report; v1 never ends). */
+    boolean controllerFinished() {
+      return count("MISSION REPORT") > 0;
+    }
+
     /**
-     * For a run that was stopped at the time limit: when the robot came to rest within
-     * {@link #STUCK_RADIUS_CM} of where it ended, if that was at least {@link #STUCK_MIN_S} before
-     * the end. NaN otherwise.
+     * For a run that was stopped at the time limit while its controller was still going: when the
+     * robot came to rest within {@link #STUCK_RADIUS_CM} of where it ended, if that was at least
+     * {@link #STUCK_MIN_S} before the end. NaN otherwise.
      */
     double stuckFromS() {
-      if (!Boolean.parseBoolean(result.getProperty("timeLimitHit", "false")) || path.isEmpty()) {
+      if (!Boolean.parseBoolean(result.getProperty("timeLimitHit", "false")) || path.isEmpty()
+          || controllerFinished()) {
         return Double.NaN;
       }
       Vec2 end = path.get(path.size() - 1);

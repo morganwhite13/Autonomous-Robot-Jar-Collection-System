@@ -87,6 +87,12 @@ class WebotsToolsTest {
     assertEquals(200, stuck.stuckFromS(), 1e-9); // within 10 cm of the end from 200 s
     assertTrue(Double.isNaN(WebotsReport.load(tmp.resolve("v2"), "v2").stuckFromS()),
         "moved until 550 s: less than two minutes at rest");
+    writeRun("v2done", "jars=5\ndelivered=4\nsimTimeS=600\ntimeLimitHit=true\n",
+        "=== MISSION REPORT (v2) ===\n");
+    Files.write(tmp.resolve("v2done").resolve("trajectory.csv"),
+        "t,x,y\n0,0,0\n100,300,0\n600,300,0\n".getBytes(StandardCharsets.UTF_8));
+    assertTrue(Double.isNaN(WebotsReport.load(tmp.resolve("v2done"), "v2done").stuckFromS()),
+        "parked after finishing its mission: not stuck");
   }
 
   @Test

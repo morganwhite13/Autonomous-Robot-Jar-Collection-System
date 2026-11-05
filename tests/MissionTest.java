@@ -172,12 +172,30 @@ class MissionTest {
   }
 
   @Test
-  void withoutTheGrabCheckASlippedJarIsCountedButNeverDelivered() {
+  void evenWithoutTheGrabCheckASlippedJarIsNoticedAndFetchedAgain() {
+    // With the grab check off, the grip watch notices on the first step of the carry that the
+    // fingers hold nothing (v1, and v2 before the watch, counted that jar as delivered).
     KinematicRobot robot = robotWithJars();
     robot.grabsThatMiss = 1;
-    assertEquals(5, new Mission(robot).run()); // what the robot believes
-    assertEquals(4, robot.deliveredJars.size()); // what is actually on the pads
-    assertEquals(1, robot.jars.size()); // still on the floor
+    Mission mission = new Mission(robot);
+    assertEquals(5, mission.run());
+    assertEquals(5, robot.deliveredJars.size()); // all actually on the pads
+    assertEquals(List.of(), robot.jars);
+    assertEquals(1, mission.stats().droppedJars());
+  }
+
+  @Test
+  void aJarThrownOutOnTheWayIsNotCountedAndTheMissionCarriesOn() {
+    // The first carry turn throws the jar (it lands on its side: the model won't let it be
+    // grabbed again). v2 notices, goes back to the search point and delivers the other four.
+    KinematicRobot robot = robotWithJars().withStepLimit(2_000_000);
+    robot.throwsJarAboveTurnSpeed = 0.5;
+    robot.jarsToThrow = 1;
+    Mission mission = new Mission(robot);
+    assertEquals(4, mission.run());
+    assertEquals(4, robot.deliveredJars.size());
+    assertEquals(1, robot.thrownJars.size());
+    assertEquals(1, mission.stats().droppedJars());
   }
 
   @Test
