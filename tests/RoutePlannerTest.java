@@ -58,13 +58,13 @@ class RoutePlannerTest {
 
   @Test
   void withoutTheClearingPhaseThereIsNoRoute() {
-    RoutePlanner planner = RoutePlanner.forWorld(world, true, RoutePlannerReport.CLEARANCE_CM);
+    RoutePlanner planner = RoutePlanning.forWorld(world, true, RoutePlannerReport.CLEARANCE_CM);
     assertTrue(planner.plan(Routes.SEARCH_POINT, Routes.DROPOFF_ENTRY).isEmpty());
   }
 
   @Test
   void plannedCarryRouteIsShorterAndKeepsClearOfStaticObstacles() {
-    RoutePlanner planner = RoutePlanner.afterClearing(world, RoutePlannerReport.CLEARANCE_CM,
+    RoutePlanner planner = RoutePlanning.afterClearing(world, RoutePlannerReport.CLEARANCE_CM,
         RoutePlannerReport.SWEEP_CM);
     List<Vec2> route = planner.plan(Routes.SEARCH_POINT, Routes.DROPOFF_ENTRY);
     assertEquals(Routes.DROPOFF_ENTRY, route.get(route.size() - 1));

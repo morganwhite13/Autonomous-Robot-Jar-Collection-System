@@ -11,6 +11,10 @@
 # Options: --limit SECONDS (simulated-time limit per run, default 3600)
 #          --watch         open the Webots window and run at real-time speed, e.g. to record a
 #                          demo video (needs a display; same observer, same results)
+#          --seed N        shuffle the jars and nudge the robot's start pose (tools/WorldShuffle.java);
+#                          0, the default, is the world as it is
+#          --out DIR       where to put the runs (default build/webots-run); docs/ is only updated
+#                          for the default folder and seed 0
 #
 # Each run gets a temporary copy of the project under build/webots-run/<version>/. The copy's
 # world adds an invisible "observer" supervisor (tools/webots/Observer.java) that records the
@@ -27,10 +31,14 @@ cd "$(dirname "$0")/.."
 LIMIT=3600
 DRY_RUN=0
 WATCH=0
+SEED=0
+RUN_ROOT="build/webots-run"
 VERSIONS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --limit) LIMIT="$2"; shift 2 ;;
+    --seed) SEED="$2"; shift 2 ;;
+    --out) RUN_ROOT="$2"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --watch) WATCH=1; shift ;;
     v1|v2|v2-planned) VERSIONS+=("$1"); shift ;;
@@ -77,8 +85,12 @@ elif [ "$(uname)" = Linux ] && [ -z "${DISPLAY:-}" ]; then
   LAUNCH=(xvfb-run -a -s "-screen 0 1280x1024x24" "$WEBOTS_BIN")
 fi
 
-RUN_ROOT="build/webots-run"
 mkdir -p "$RUN_ROOT"
+TOOLS="$RUN_ROOT/tools"
+rm -rf "$TOOLS" && mkdir -p "$TOOLS"
+javac --release 11 -nowarn -d "$TOOLS" controllers/JarCollectorV2/{Vec2,Angles,Routes}.java \
+  tools/WorldFile.java controllers/JarCollectorV2/RoutePlanner.java tools/MapRenderer.java tools/WebotsReport.java \
+  tools/WorldShuffle.java
 
 for version in "${VERSIONS[@]}"; do
   case "$version" in
@@ -113,6 +125,9 @@ for version in "${VERSIONS[@]}"; do
       print "  supervisor TRUE"
       print "}"
     }' "worlds/$world" > "$dir/worlds/$world"
+  if [ "$SEED" != 0 ]; then
+    java -cp "$TOOLS" WorldShuffle "$dir/worlds/$world" "$SEED" | sed 's/^/    /'
+  fi
 
   # Compile the controllers up front (what Webots' Build button does) so a compile error
   # shows up here rather than as a silent controller crash.
@@ -139,16 +154,17 @@ done
 [ "$DRY_RUN" = 1 ] && exit 0
 
 echo "==> Writing report"
-rm -rf build/report-tools && mkdir -p build/report-tools
-javac --release 11 -nowarn -d build/report-tools \
-  controllers/JarCollectorV2/{Vec2,Angles,Routes}.java tools/WorldFile.java tools/MapRenderer.java tools/WebotsReport.java
-java -cp build/report-tools WebotsReport "$RUN_ROOT" "${VERSIONS[@]}" > "$RUN_ROOT/report.md"
+java -cp "$TOOLS" WebotsReport "$RUN_ROOT" "${VERSIONS[@]}" > "$RUN_ROOT/report.md"
 paths=()
 for version in "${VERSIONS[@]}"; do
   [ -f "$RUN_ROOT/$version/trajectory.csv" ] && paths+=(--path "$version=$RUN_ROOT/$version/trajectory.csv")
 done
 if [ ${#paths[@]} -gt 0 ]; then
-  java -cp build/report-tools MapRenderer worlds/ProjectWorld2025.wbt "$RUN_ROOT/paths.svg" "${paths[@]}"
+  map_world=worlds/ProjectWorld2025.wbt
+  if [ "$SEED" != 0 ]; then # draw the shuffled jars
+    map_world=$(find "$RUN_ROOT/${VERSIONS[0]}/worlds" -name '*.wbt' | head -1)
+  fi
+  java -cp "$TOOLS" MapRenderer "$map_world" "$RUN_ROOT/paths.svg" "${paths[@]}"
 fi
 cat "$RUN_ROOT/report.md"
 
@@ -157,7 +173,8 @@ ran() { # version
   for v in "${VERSIONS[@]}"; do [ "$v" = "$1" ] && return 0; done
   return 1
 }
-if ran v1 && ran v2 && [ -f "$RUN_ROOT/paths.svg" ]; then
+if ran v1 && ran v2 && [ -f "$RUN_ROOT/paths.svg" ] && [ "$SEED" = 0 ] \
+    && [ "$RUN_ROOT" = build/webots-run ]; then
   {
     echo "# Webots results"
     echo

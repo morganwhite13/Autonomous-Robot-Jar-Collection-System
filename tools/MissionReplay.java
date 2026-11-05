@@ -117,7 +117,7 @@ public class MissionReplay {
 
     // Cardboard boxes on the clearing route are pushed aside in Webots; the model can't push them.
     map.beginArena(world, "v1 vs v2 running the whole mission (replay)",
-        RoutePlanner.sweptByClearing(world, SWEEP_CM));
+        RoutePlanning.sweptByClearing(world, SWEEP_CM));
     map.append(String.format(Locale.ROOT, "<desc>Animated replay at %.0fx speed of both "
         + "controllers running the whole mission on the robot model with motor lag and wheel slip. "
         + "%s</desc>", SPEEDUP, summary(v1, v2)));

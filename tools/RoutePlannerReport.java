@@ -27,10 +27,10 @@ public class RoutePlannerReport {
   public static void main(String[] args) throws IOException {
     WorldFile world = WorldFile.read(Path.of(args[0]));
 
-    RoutePlanner noClearing = RoutePlanner.forWorld(world, true, CLEARANCE_CM);
-    RoutePlanner afterClearing = RoutePlanner.afterClearing(world, CLEARANCE_CM, SWEEP_CM);
-    RoutePlanner staticOnly = RoutePlanner.forWorld(world, false, CLEARANCE_CM);
-    List<WorldFile.Obstacle> swept = RoutePlanner.sweptByClearing(world, SWEEP_CM);
+    RoutePlanner noClearing = RoutePlanning.forWorld(world, true, CLEARANCE_CM);
+    RoutePlanner afterClearing = RoutePlanning.afterClearing(world, CLEARANCE_CM, SWEEP_CM);
+    RoutePlanner staticOnly = RoutePlanning.forWorld(world, false, CLEARANCE_CM);
+    List<WorldFile.Obstacle> swept = RoutePlanning.sweptByClearing(world, SWEEP_CM);
     int boxes = world.ofKind(WorldFile.Kind.CARDBOARD_BOX).size();
 
     Vec2 search = Routes.SEARCH_POINT;
@@ -111,7 +111,7 @@ public class RoutePlannerReport {
   static List<Vec2> plannedCarry(WorldFile world) {
     List<Vec2> route = new ArrayList<>();
     route.add(BAY_EXIT);
-    route.addAll(RoutePlanner.afterClearing(world, CLEARANCE_CM, SWEEP_CM)
+    route.addAll(RoutePlanning.afterClearing(world, CLEARANCE_CM, SWEEP_CM)
         .plan(BAY_EXIT, Routes.DROPOFF_ENTRY));
     return rounded(route);
   }
@@ -120,7 +120,7 @@ public class RoutePlannerReport {
   static List<Vec2> plannedReturn(WorldFile world) {
     List<Vec2> route = new ArrayList<>();
     route.add(Routes.DROPOFF_ENTRY);
-    route.addAll(RoutePlanner.afterClearing(world, CLEARANCE_CM, SWEEP_CM)
+    route.addAll(RoutePlanning.afterClearing(world, CLEARANCE_CM, SWEEP_CM)
         .plan(Routes.DROPOFF_ENTRY, Routes.SEARCH_POINT));
     return rounded(route);
   }

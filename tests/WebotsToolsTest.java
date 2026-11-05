@@ -112,4 +112,77 @@ class WebotsToolsTest {
     Files.write(dir.resolve("webots.log"), log.getBytes(StandardCharsets.UTF_8));
     Files.write(dir.resolve("trajectory.csv"), "t,x,y\n0,0,0\n1,60,80\n".getBytes(StandardCharsets.UTF_8));
   }
+
+  @Test
+  void shuffledWorldsPutTheJarsInTheBayAndBarelyMoveTheRobot() throws Exception {
+    WorldFile world = WorldFile.read(Path.of("worlds/ProjectWorld2025.wbt"));
+    for (long seed = 1; seed <= 25; seed++) {
+      WorldShuffle.Variant v = WorldShuffle.variant(world, seed);
+      assertEquals(5, v.jars.size());
+      for (int i = 0; i < v.jars.size(); i++) {
+        Vec2 jar = v.jars.get(i);
+        assertTrue(jar.x >= WorldShuffle.JAR_MIN_X && jar.x <= WorldShuffle.JAR_MAX_X
+            && jar.y >= WorldShuffle.JAR_MIN_Y && jar.y <= WorldShuffle.JAR_MAX_Y, "seed " + seed);
+        for (int k = 0; k < i; k++) {
+          assertTrue(jar.distanceTo(v.jars.get(k)) >= WorldShuffle.JAR_SPACING_CM, "seed " + seed);
+        }
+        for (WorldFile.Obstacle o : world.obstacles) {
+          if (o.kind != WorldFile.Kind.HONEY_JAR) {
+            assertTrue(RoutePlanner.distanceToPolygon(jar, o.corners) >= WorldShuffle.JAR_CLEARANCE_CM,
+                "seed " + seed + " jar " + jar + " vs " + o.name);
+          }
+        }
+      }
+      assertTrue(v.start.distanceTo(world.robotStart) <= WorldShuffle.START_SHIFT_CM);
+      assertTrue(Math.abs(v.startTurnDeg) <= WorldShuffle.START_TURN_DEG);
+    }
+    assertEquals(WorldShuffle.variant(world, 7).jars, WorldShuffle.variant(world, 7).jars);
+  }
+
+  @Test
+  void shufflingRewritesOnlyTheRobotPoseAndTheJarPositions() throws Exception {
+    Path copy = tmp.resolve("w.wbt");
+    Files.copy(Path.of("worlds/ProjectWorld2025.wbt"), copy);
+    WorldShuffle.main(new String[] {copy.toString(), "3"});
+    List<String> before = Files.readAllLines(Path.of("worlds/ProjectWorld2025.wbt"));
+    List<String> after = Files.readAllLines(copy);
+    assertEquals(before.size(), after.size());
+    int changed = 0;
+    for (int i = 0; i < before.size(); i++) {
+      if (!before.get(i).equals(after.get(i))) {
+        changed++;
+        String t = after.get(i).trim();
+        assertTrue(t.startsWith("translation ") || t.startsWith("rotation 0 1 0 "), after.get(i));
+      }
+    }
+    assertEquals(7, changed); // robot translation and rotation, five jars
+    WorldFile shuffled = WorldFile.read(copy);
+    WorldShuffle.Variant v = WorldShuffle.variant(WorldFile.read(Path.of("worlds/ProjectWorld2025.wbt")), 3);
+    assertTrue(shuffled.robotStart.distanceTo(v.start) < 0.01);
+    List<WorldFile.Obstacle> jars = shuffled.ofKind(WorldFile.Kind.HONEY_JAR);
+    for (int i = 0; i < 5; i++) {
+      assertTrue(jars.get(i).center.distanceTo(v.jars.get(i)) < 0.01);
+    }
+    Path untouched = tmp.resolve("same.wbt");
+    Files.copy(Path.of("worlds/ProjectWorld2025.wbt"), untouched);
+    WorldShuffle.main(new String[] {untouched.toString(), "0"});
+    assertEquals(before, Files.readAllLines(untouched));
+  }
+
+  @Test
+  void sweepReportCountsWorldsWhereEveryJarWasDelivered() throws Exception {
+    writeRun("v2", "jars=5\ndelivered=5\ndeliveryTimesS=100,800.00\nsimTimeS=802\n",
+        "Jars remaining: 4\nJars remaining: 3\nJars remaining: 2\nJars remaining: 1\nJars remaining: 0\n");
+    WebotsReport.Run full = WebotsReport.load(tmp.resolve("v2"), "v2");
+    writeRun("v1", "jars=5\ndelivered=0\nsimTimeS=1500\ntimeLimitHit=true\n", "Jars remaining: 4\n");
+    WebotsReport.Run none = WebotsReport.load(tmp.resolve("v1"), "v1");
+    String md = WebotsSweepReport.markdown(List.of(1, 2), List.of("v1", "v2"),
+        List.of(java.util.Arrays.asList(none, full), java.util.Arrays.asList(none, null)), "1500");
+    assertTrue(md.contains("| Delivered all 5 jars | 0 of 2 worlds | 1 of 1 worlds |"), md);
+    assertTrue(md.contains("| Jars delivered in total | 0 of 10 | 5 of 5 |"), md);
+    assertTrue(md.contains("| Jars the controller says it delivered | 2 | 5 |"), md);
+    assertTrue(md.contains("| Mission time when all 5 were delivered (median, range) | - | 800 s (800-800 s) |"), md);
+    assertTrue(md.contains("| 1 | 0/5 (claimed 1) | 5/5, 800 s |"), md);
+    assertTrue(md.contains("| 2 | 0/5 (claimed 1) | not run |"), md);
+  }
 }

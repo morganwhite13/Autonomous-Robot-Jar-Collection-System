@@ -5,9 +5,10 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 /**
- * A* path planner on an occupancy grid, used to compare the hand-tuned waypoint routes with
- * the shortest routes that keep the same clearance from obstacles. Analysis only: the robot
- * does not use it (see tools/RoutePlannerReport.java and docs/route-planner.md).
+ * A* path planner on an occupancy grid. v2 uses it to find a way around something that stopped
+ * it ({@link Navigator}), on the map of walls and immovable boxes in {@link ArenaMap}. The tools
+ * also use it to compare the hand-tuned routes with the shortest routes that keep the same
+ * clearance (tools/RoutePlanning.java, docs/route-planner.md).
  *
  * <p>Obstacles are footprint polygons in the controllers' cm frame. A grid cell is blocked if
  * its centre is within {@code clearanceCm} of any obstacle. The raw 8-connected A* path is then
@@ -36,50 +37,6 @@ final class RoutePlanner {
     }
   }
 
-  /** Planner for a world file: walls and wooden boxes, plus cardboard boxes if requested. */
-  static RoutePlanner forWorld(WorldFile world, boolean cardboardIsObstacle, double clearanceCm) {
-    List<Vec2[]> polygons = new ArrayList<>();
-    for (WorldFile.Obstacle o : world.obstacles) {
-      if (o.isStatic() || (cardboardIsObstacle && o.kind == WorldFile.Kind.CARDBOARD_BOX)) {
-        polygons.add(o.corners);
-      }
-    }
-    return new RoutePlanner(polygons, clearanceCm, 5, -1000, -1000, 1000, 1000);
-  }
-
-  /**
-   * Cardboard boxes the box-clearing route passes within {@code sweepCm} of. These are assumed to
-   * be pushed out of the way; the others are assumed to stay where they started.
-   */
-  static List<WorldFile.Obstacle> sweptByClearing(WorldFile world, double sweepCm) {
-    List<Vec2> route = new ArrayList<>();
-    route.add(world.robotStart);
-    route.addAll(Routes.CLEARING_PATH);
-    List<WorldFile.Obstacle> swept = new ArrayList<>();
-    for (WorldFile.Obstacle box : world.ofKind(WorldFile.Kind.CARDBOARD_BOX)) {
-      for (int i = 0; i + 1 < route.size(); i++) {
-        if (WorldFile.clearance(route.get(i), route.get(i + 1), box) <= sweepCm) {
-          swept.add(box);
-          break;
-        }
-      }
-    }
-    return swept;
-  }
-
-  /** Planner for the state after the clearing phase: static obstacles plus unswept boxes. */
-  static RoutePlanner afterClearing(WorldFile world, double clearanceCm, double sweepCm) {
-    List<WorldFile.Obstacle> swept = sweptByClearing(world, sweepCm);
-    List<Vec2[]> polygons = new ArrayList<>();
-    for (WorldFile.Obstacle o : world.obstacles) {
-      boolean unsweptBox = o.kind == WorldFile.Kind.CARDBOARD_BOX && !swept.contains(o);
-      if (o.isStatic() || unsweptBox) {
-        polygons.add(o.corners);
-      }
-    }
-    return new RoutePlanner(polygons, clearanceCm, 5, -1000, -1000, 1000, 1000);
-  }
-
   private void markBlocked(Vec2[] polygon, double clearance) {
     double lx = Double.MAX_VALUE;
     double ly = Double.MAX_VALUE;
@@ -106,14 +63,35 @@ final class RoutePlanner {
   }
 
   static double distanceToPolygon(Vec2 p, Vec2[] polygon) {
-    if (WorldFile.contains(polygon, p)) {
+    if (contains(polygon, p)) {
       return 0;
     }
     double best = Double.MAX_VALUE;
     for (int i = 0; i < polygon.length; i++) {
-      best = Math.min(best, WorldFile.pointToSegment(p, polygon[i], polygon[(i + 1) % polygon.length]));
+      best = Math.min(best, pointToSegment(p, polygon[i], polygon[(i + 1) % polygon.length]));
     }
     return best;
+  }
+
+  /** Point-in-polygon by ray casting. */
+  static boolean contains(Vec2[] polygon, Vec2 p) {
+    boolean inside = false;
+    for (int i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      Vec2 a = polygon[i];
+      Vec2 b = polygon[j];
+      if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  static double pointToSegment(Vec2 p, Vec2 a, Vec2 b) {
+    double dx = b.x - a.x;
+    double dy = b.y - a.y;
+    double len2 = dx * dx + dy * dy;
+    double t = len2 == 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+    return p.distanceTo(Vec2.of(a.x + t * dx, a.y + t * dy));
   }
 
   boolean isFree(Vec2 p) {
