@@ -13,11 +13,13 @@ import java.util.Locale;
  *   <li>Driving steers towards the waypoint. v1 drove open-loop, so a 3 degree heading error
  *       became about 28 cm of sideways error over the longest (530 cm) leg.</li>
  *   <li>Drives detect stalls and have a timeout. v1 looped forever if the robot was blocked.</li>
+ *   <li>Optionally ({@link Config#SONAR_WATCH}), travel legs use the front sonars to slow down for
+ *       and stop short of obstacles. v1 never used the sonars.</li>
  * </ul>
  */
 final class Navigator {
 
-  enum DriveResult { ARRIVED, STALLED, TIMED_OUT }
+  enum DriveResult { ARRIVED, STALLED, TIMED_OUT, OBSTACLE_AHEAD }
 
   private final RobotPlatform robot;
   private final MissionStats stats;
@@ -29,20 +31,32 @@ final class Navigator {
 
   /** Visits every waypoint in order. Returns false if any leg did not arrive cleanly. */
   boolean followRoute(List<Vec2> waypoints) {
+    return followRoute(waypoints, false);
+  }
+
+  /**
+   * Visits every waypoint in order; with {@code watchAhead}, each leg slows down for and stops
+   * short of obstacles the front sonars see (see {@link Config#SONAR_WATCH}).
+   */
+  boolean followRoute(List<Vec2> waypoints, boolean watchAhead) {
     boolean clean = true;
     for (Vec2 waypoint : waypoints) {
-      clean &= goTo(waypoint) == DriveResult.ARRIVED;
+      clean &= goTo(waypoint, watchAhead) == DriveResult.ARRIVED;
     }
     return clean;
   }
 
   DriveResult goTo(Vec2 target) {
+    return goTo(target, false);
+  }
+
+  DriveResult goTo(Vec2 target, boolean watchAhead) {
     Vec2 here = robot.positionCm();
     if (here.distanceTo(target) < 1.0) {
       return DriveResult.ARRIVED;
     }
     turnTo(here.bearingTo(target), Config.MAX_SPEED);
-    return driveTo(target);
+    return driveTo(target, watchAhead);
   }
 
   /**
@@ -78,6 +92,11 @@ final class Navigator {
    * stopping rule), steering towards the target on the way.
    */
   DriveResult driveTo(Vec2 target) {
+    return driveTo(target, false);
+  }
+
+  /** As {@link #driveTo(Vec2)}; with {@code watchAhead}, also slows down and stops for echoes. */
+  DriveResult driveTo(Vec2 target, boolean watchAhead) {
     Vec2 start = robot.positionCm();
     double length = start.distanceTo(target);
     int timeout = Math.max(Config.DRIVE_TIMEOUT_MIN_STEPS,
@@ -98,10 +117,25 @@ final class Navigator {
         correction = clamp(error * Config.HEADING_HOLD_GAIN,
             -Config.HEADING_HOLD_MAX_CORRECTION, Config.HEADING_HOLD_MAX_CORRECTION);
       }
+      double speed = Config.MAX_SPEED;
+      if (watchAhead) {
+        double ahead = robot.frontObstacleCm();
+        if (ahead < here.distanceTo(target)) { // something is in the way before the waypoint
+          if (ahead <= Config.SONAR_STOP_CM) {
+            robot.stop();
+            stats.recordObstacleStop();
+            Log.warn(String.format(Locale.ROOT, "sonar: obstacle %.0f cm ahead at %s while driving "
+                + "to %s; stopping and skipping to the next leg", ahead, here, target));
+            return DriveResult.OBSTACLE_AHEAD;
+          }
+          speed *= clamp((ahead - Config.SONAR_STOP_CM)
+              / (Config.SONAR_SLOW_CM - Config.SONAR_STOP_CM), Config.SONAR_MIN_SPEED_FRACTION, 1);
+        }
+      }
       // Positive error = target is to the left, so speed up the right wheel.
       robot.drive(
-          clamp(Config.MAX_SPEED - correction, -Config.MAX_SPEED, Config.MAX_SPEED),
-          clamp(Config.MAX_SPEED + correction, -Config.MAX_SPEED, Config.MAX_SPEED));
+          clamp(speed - correction, -Config.MAX_SPEED, Config.MAX_SPEED),
+          clamp(speed + correction, -Config.MAX_SPEED, Config.MAX_SPEED));
       robot.step();
 
       if (++stepsSinceCheckpoint >= Config.STALL_WINDOW_STEPS) {

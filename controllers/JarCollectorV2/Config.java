@@ -132,6 +132,21 @@ final class Config {
   static final int RELEASE_STEPS = 50;
   static final int BACKUP_AFTER_RELEASE_STEPS = 50;
 
+  // ------------------------------------------------------------------ sonar watch (new)
+  /**
+   * new, off by default: on travel legs (not the box-clearing route, which has to push boxes,
+   * and not placement), slow down for anything the two front sonars see before the waypoint, and
+   * stop short of it instead of driving into it. v1 printed the sonars once and never used them.
+   * Off until it has been tuned in Webots.
+   */
+  static final boolean SONAR_WATCH = false;
+  /** new: start slowing down when an echo is this close (cm from the sonars). */
+  static final double SONAR_SLOW_CM = 100;
+  /** new: stop and skip to the next waypoint when an echo is this close. */
+  static final double SONAR_STOP_CM = 25;
+  /** new: slowest speed while slowing down, as a fraction of MAX_SPEED. */
+  static final double SONAR_MIN_SPEED_FRACTION = 0.2;
+
   // ------------------------------------------------------------------ grab check (new)
   /**
    * new, off by default: after lifting, check that the fingers are squeezing something and

@@ -44,7 +44,7 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 131 JUnit tests covering 99% of v2's logic and catching 94% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 137 JUnit tests covering 99% of v2's logic and catching 94% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -84,7 +84,7 @@ A replay at 30x speed, on the robot model with motor lag and wheel slip. v1 neve
 | **Touch sensor** (front bumper) | Knowing when a jar is between the gripper fingers |
 | **Pioneer gripper** (lift motor and two finger motors) | Grabbing, lifting and releasing jars |
 | **Supervisor API** | Ground-truth position for waypoint navigation |
-| 6 sonar sensors | Printed once in the start-up self-test; not used for navigation (yet) |
+| 6 sonar sensors | Start-up self-test. The two front ones also drive v2's opt-in sonar watch (`Config.SONAR_WATCH`, off by default), which stops short of obstacles on travel legs |
 
 ### Jar detection
 
@@ -214,7 +214,7 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 131 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 137 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
@@ -307,8 +307,8 @@ docs/
 ### Next, following on from v2
 1. Run both versions in Webots (`tools/run-in-webots.sh`) and publish the results
 2. Confirm the reconstructed robot protos load in Webots (or swap in the originals)
-3. Use the front sonars to detect obstacles, instead of only noticing a stall afterwards
-4. A real grab check, calibrated from the "camera now sees N green px" line v2 logs after each lift
+3. Tune and switch on the sonar watch, which stops short of obstacles in the way instead of noticing a stall afterwards. It's built and tested on the robot model (`Config.SONAR_WATCH`). After stopping it skips to the next waypoint like a stall does; planning a way around the obstacle would be the step after.
+4. Calibrate and switch on the grab check (`Config.VERIFY_GRABS`) from the grip effort v2 logs after each lift
 
 ### Original roadmap
 5. **Dynamic pathfinding**: replace hardcoded waypoints with A* or Dijkstra. *Started:* [an A* analysis](docs/route-planner.md) finds routes about 13-14% shorter than the hand-tuned ones after the clearing phase (and no route at all without it). v2 can use them via `Config.USE_PLANNED_ROUTES`, off by default; on the robot model the mission finishes about 9% sooner

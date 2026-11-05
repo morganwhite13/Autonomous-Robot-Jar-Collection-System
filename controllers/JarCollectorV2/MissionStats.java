@@ -39,6 +39,7 @@ final class MissionStats {
   private int turnTimeouts;
   private int failedSearches;
   private int missedGrabs;
+  private int obstacleStops;
 
   MissionStats(LongSupplier clockMs) {
     this.clockMs = clockMs;
@@ -87,6 +88,10 @@ final class MissionStats {
     missedGrabs++;
   }
 
+  void recordObstacleStop() {
+    obstacleStops++;
+  }
+
   void recordDriveStall() {
     driveStalls++;
   }
@@ -120,9 +125,14 @@ final class MissionStats {
     return missedGrabs;
   }
 
-  /** Drive stalls, drive timeouts and turn timeouts: legs that didn't end where planned. */
+  /** Legs the sonar watch cut short because something was in the way. */
+  int obstacleStops() {
+    return obstacleStops;
+  }
+
+  /** Stalls, timeouts and sonar stops: legs that didn't end where planned. */
   int navigationProblems() {
-    return driveStalls + driveTimeouts + turnTimeouts;
+    return driveStalls + driveTimeouts + turnTimeouts + obstacleStops;
   }
 
   void jarDelivered() {
@@ -175,8 +185,8 @@ final class MissionStats {
     }
     sb.append(String.format(Locale.ROOT,
         "%nAnomalies: drive stalls=%d, drive timeouts=%d, turn timeouts=%d, failed searches=%d, "
-            + "missed grabs=%d%n",
-        driveStalls, driveTimeouts, turnTimeouts, failedSearches, missedGrabs));
+            + "missed grabs=%d, sonar stops=%d%n",
+        driveStalls, driveTimeouts, turnTimeouts, failedSearches, missedGrabs, obstacleStops));
     sb.append("==============================================================");
     return sb.toString();
   }

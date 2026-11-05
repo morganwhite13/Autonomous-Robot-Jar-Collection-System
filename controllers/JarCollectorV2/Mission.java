@@ -32,6 +32,7 @@ final class Mission {
   static final class Options {
     Routes.RouteSet routes = Config.USE_PLANNED_ROUTES ? Routes.PLANNED : Routes.HAND_TUNED;
     boolean verifyGrabs = Config.VERIFY_GRABS;
+    boolean sonarWatch = Config.SONAR_WATCH;
 
     Options routes(Routes.RouteSet set) {
       routes = set;
@@ -40,6 +41,11 @@ final class Mission {
 
     Options verifyGrabs(boolean on) {
       verifyGrabs = on;
+      return this;
+    }
+
+    Options sonarWatch(boolean on) {
+      sonarWatch = on;
       return this;
     }
   }
@@ -76,6 +82,9 @@ final class Mission {
     }
     if (options.verifyGrabs) {
       Log.info("Grab check on: a grab that isn't holding anything is retried");
+    }
+    if (options.sonarWatch) {
+      Log.info("Sonar watch on: travel legs stop short of obstacles in the way");
     }
     clearPath();
 
@@ -120,7 +129,7 @@ final class Mission {
   private void goToSearchPoint(boolean fromDropoff) {
     stats.beginPhase(PHASE_TO_SEARCH);
     List<Vec2> route = fromDropoff ? routes.dropoffToSearch : Routes.TO_SEARCH_POINT;
-    nav.followRoute(route);
+    nav.followRoute(route, options.sonarWatch);
   }
 
   private boolean searchAndGrab() {
@@ -135,7 +144,7 @@ final class Mission {
   /** Carries the held jar to the drop-off and places it in slot {@code jarIndex}. */
   private void deliver(int jarIndex) {
     stats.beginPhase(PHASE_TO_DROPOFF);
-    nav.followRoute(routes.searchToDropoff);
+    nav.followRoute(routes.searchToDropoff, options.sonarWatch);
     stats.beginPhase(PHASE_PLACE);
     jars.place(jarIndex);
     stats.jarDelivered();

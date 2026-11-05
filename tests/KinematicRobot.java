@@ -67,6 +67,10 @@ final class KinematicRobot implements RobotPlatform {
   static final double GRIPPER_TOLERANCE = 1e-6;
   /** Positions the robot centre may not enter (e.g. a wall for stall tests). */
   Predicate<Vec2> blocked = p -> false;
+  /** Solid obstacle outlines: they block the robot (see {@link #withStaticObstacles}) and echo sonar. */
+  private final List<Vec2[]> solids = new ArrayList<>();
+  /** Forward speed (cm/s) the first time an obstacle stopped the robot; NaN if it never touched one. */
+  double firstContactSpeedCmS = Double.NaN;
 
   KinematicRobot(Vec2 position, double headingDeg) {
     this(position, headingDeg, 32);
@@ -139,6 +143,8 @@ final class KinematicRobot implements RobotPlatform {
     if (!blocked.test(next)) {
       x = next.x;
       y = next.y;
+    } else if (Double.isNaN(firstContactSpeedCmS)) {
+      firstContactSpeedCmS = Math.abs(v);
     }
     heading = Angles.normalize(heading + Math.toDegrees(omega * dt));
     cumulativeTurnDeg += Math.toDegrees(omega * dt);
@@ -183,19 +189,79 @@ final class KinematicRobot implements RobotPlatform {
 
   /** Makes walls and immovable boxes solid: the robot centre can't come within radiusCm. */
   KinematicRobot withStaticObstacles(WorldFile world, double radiusCm) {
-    List<Vec2[]> solid = new ArrayList<>();
     for (WorldFile.Obstacle o : world.staticObstacles()) {
-      solid.add(o.corners);
+      solids.add(o.corners);
     }
+    blockBySolids(radiusCm);
+    return this;
+  }
+
+  /** Adds a solid square box (e.g. one that has ended up somewhere unexpected). */
+  KinematicRobot withBox(Vec2 center, double halfSizeCm) {
+    solids.add(new Vec2[] {
+        Vec2.of(center.x - halfSizeCm, center.y - halfSizeCm),
+        Vec2.of(center.x + halfSizeCm, center.y - halfSizeCm),
+        Vec2.of(center.x + halfSizeCm, center.y + halfSizeCm),
+        Vec2.of(center.x - halfSizeCm, center.y + halfSizeCm)});
+    blockBySolids(ROBOT_RADIUS_CM);
+    return this;
+  }
+
+  private void blockBySolids(double radiusCm) {
     blocked = p -> {
-      for (Vec2[] polygon : solid) {
+      for (Vec2[] polygon : solids) {
         if (RoutePlanner.distanceToPolygon(p, polygon) < radiusCm) {
           return true;
         }
       }
       return false;
     };
-    return this;
+  }
+
+  /**
+   * Front sonars so3 and so4 from the Pioneer3dx proto: position (cm forward, cm left of the
+   * centre) and beam direction relative to the heading.
+   */
+  private static final double[][] FRONT_SONARS = {{16.4, 2.85, 10}, {16.4, -2.64, -10}};
+  static final double SONAR_RANGE_CM = 500;
+  /** Webots sonars get no echo from a surface hit more than 22.5 degrees off its normal. */
+  static final double SONAR_MAX_INCIDENCE_DEG = 22.5;
+
+  /** A single ray per sonar, as in Webots, against the solid obstacles. */
+  @Override
+  public double frontObstacleCm() {
+    double nearest = Double.POSITIVE_INFINITY;
+    double h = Math.toRadians(heading);
+    double minCos = Math.cos(Math.toRadians(SONAR_MAX_INCIDENCE_DEG));
+    for (double[] sonar : FRONT_SONARS) {
+      double ox = x + sonar[0] * Math.cos(h) - sonar[1] * Math.sin(h);
+      double oy = y + sonar[0] * Math.sin(h) + sonar[1] * Math.cos(h);
+      double a = h + Math.toRadians(sonar[2]);
+      double dx = Math.cos(a);
+      double dy = Math.sin(a);
+      for (Vec2[] polygon : solids) {
+        for (int i = 0; i < polygon.length; i++) {
+          Vec2 p = polygon[i];
+          Vec2 q = polygon[(i + 1) % polygon.length];
+          double ex = q.x - p.x;
+          double ey = q.y - p.y;
+          double denom = dx * ey - dy * ex;
+          if (Math.abs(denom) < 1e-12) {
+            continue; // beam parallel to the edge
+          }
+          double t = ((p.x - ox) * ey - (p.y - oy) * ex) / denom;
+          double u = ((p.x - ox) * dy - (p.y - oy) * dx) / denom;
+          if (t < 0 || t > SONAR_RANGE_CM || u < 0 || u > 1) {
+            continue;
+          }
+          double cosIncidence = Math.abs(-dx * ey + dy * ex) / Math.hypot(ex, ey);
+          if (cosIncidence >= minCos) {
+            nearest = Math.min(nearest, t);
+          }
+        }
+      }
+    }
+    return nearest;
   }
 
   @Override

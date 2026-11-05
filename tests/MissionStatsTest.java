@@ -114,13 +114,17 @@ class MissionStatsTest {
     stats.recordTurnTimeout();
     stats.recordTurnTimeout();
     stats.recordFailedSearch();
+    stats.recordObstacleStop();
+    stats.recordMissedGrab();
     assertEquals(1, stats.driveStalls());
     assertEquals(2, stats.driveTimeouts());
     assertEquals(3, stats.turnTimeouts());
-    assertEquals(6, stats.navigationProblems());
+    assertEquals(1, stats.obstacleStops());
+    assertEquals(7, stats.navigationProblems());
     assertEquals(1, stats.failedSearches());
-    assertTrue(stats.report().contains(
-        "drive stalls=1, drive timeouts=2, turn timeouts=3, failed searches=1"), stats.report());
+    assertEquals(1, stats.missedGrabs());
+    assertTrue(stats.report().contains("drive stalls=1, drive timeouts=2, turn timeouts=3, "
+        + "failed searches=1, missed grabs=1, sonar stops=1"), stats.report());
   }
 
   @Test

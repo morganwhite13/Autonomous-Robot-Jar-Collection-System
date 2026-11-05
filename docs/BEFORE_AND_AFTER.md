@@ -18,8 +18,8 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 
 **Done:**
 - Both controllers compile against the real Webots R2025a `Controller.jar`. CI compiles them against API stubs whose signatures were copied from that jar.
-- 131 JUnit tests, covering 99% of the lines in v2's logic (measured with `tools/run-tests.sh --coverage`). Most run v2's real navigation, search and mission classes on a kinematic model of the Pioneer 3-DX (wheel radius 9.75 cm, axle track 33 cm, 32 ms steps, synthetic 64x64 camera). A small scripted fake covers the edge cases the model can't stage, such as exact pixel counts or the bumper pressing mid-pause.
-- Mutation testing (`tools/mutation-test.sh`, [PIT](https://pitest.org/)): of 381 small deliberate bugs injected into v2's logic, the tests catch 360 (94%). The first run caught only 56%, even with 96% line coverage, which is what prompted most of the tests above. The 21 that survive were each checked by hand. 7 can't change behaviour, such as `d < 0` vs `d <= 0` before a wrap-around that maps 360 back to 0. 8 only change log text. 6 only differ when a measured distance or angle lands exactly on a threshold, like 2.000… cm of progress. CI fails below 90%.
+- 137 JUnit tests, covering 99% of the lines in v2's logic (measured with `tools/run-tests.sh --coverage`). Most run v2's real navigation, search and mission classes on a kinematic model of the Pioneer 3-DX (wheel radius 9.75 cm, axle track 33 cm, 32 ms steps, synthetic 64x64 camera). A small scripted fake covers the edge cases the model can't stage, such as exact pixel counts or the bumper pressing mid-pause.
+- Mutation testing (`tools/mutation-test.sh`, [PIT](https://pitest.org/)): of 400 small deliberate bugs injected into v2's logic, the tests catch 376 (94%). The first run caught only 56%, even with 96% line coverage, which is what prompted most of the tests above. The 24 that survive were each checked by hand. 7 can't change behaviour, such as `d < 0` vs `d <= 0` before a wrap-around that maps 360 back to 0. 9 only change log text. 8 only differ when a measured distance or angle lands exactly on a threshold, like 2.000… cm of progress. CI fails below 90%.
 - Refactors are checked against a recorded baseline: full mission logs from 6 scenarios (ideal model, planned routes, motor lag and wheel slip, one jar, no jars, blocked start) plus every way an approach can end. The logs, timings, positions and wheel commands must match the previous version exactly.
 - The v1 methods being compared, and v1's whole mission loop, were ported line for line into [`tests/LegacyV1.java`](../tests/LegacyV1.java) and [`tests/LegacyV1Mission.java`](../tests/LegacyV1Mission.java) and measured on the same model ([`docs/benchmark-results.md`](benchmark-results.md)). [`LegacyBehaviourTest`](../tests/LegacyBehaviourTest.java) pins each v1 behaviour described here, so the claims fail loudly if they stop being true.
 - Route geometry was checked against the obstacles parsed from the `.wbt` file.
@@ -47,6 +47,7 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 | Route after a failed search for jars 2-5 | 41 m, first leg through **4 static wooden boxes** | 0.8 m |
 | Mission when no jar can be found | retries forever | stops after 3 failed searches with a report |
 | A jar slips out of the gripper on the first grab | reports success, holding nothing | with the grab check on (off by default): holding the jar after 2 grabs |
+| 30 cm box in the middle of a straight 3 m leg | hits it at 49 cm/s and keeps pushing | hits it at 49 cm/s and gives up after 3.8 s; with the sonar watch on (off by default) never touches it, stopping 24 cm short |
 | Whole mission (walls and wooden boxes solid) | **0/5 jars, never finishes**: stuck from 20 s turning on the 5th leg of the box-clearing route | 5/5 jars, 815 s simulated, 0 stalls |
 
 **With motor lag and wheel slip.** The model is ideal, so the benchmark repeats the checks with every wheel command applied 64 ms late and turns reaching only 70% of their ideal rate. Neither version was tuned for these values.
@@ -209,6 +210,11 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
   - **On the model:** with a jar that slips out on the first grab, v1 reports success while holding nothing, and v2 with the check on is holding the jar after its second grab. Over a whole mission with one slipped jar, v2 with the check off believes it delivered 5 jars while only 4 reach the pads; with the check on, all 5 do (`MissionTest`).
 - **Unrepeatable runs:** `Math.random()` (line 437) made every run different. v2 uses a seeded `Random`, and `MissionTest` checks that two runs produce identical logs.
 - **Compass precision:** v1 cast headings to `int` (line 522), losing up to 1°. v2 keeps doubles. `AnglesTest` checks that the formula is otherwise identical.
+- **Sonars never used:** v1 enabled six sonars and only printed them at start-up (lines 110-119). v2 has an optional **sonar watch**, off by default until it's tuned in Webots (`Config.SONAR_WATCH`):
+  - **What it does:** on travel legs, if the two front sonars (so3, so4) hear an echo closer than the waypoint, v2 slows down in proportion and stops 25 cm short instead of driving into it.
+  - **Where it's off:** the box-clearing route, which has to push boxes, and placement, which drives up to the pads.
+  - **The model's sonar:** it uses the proto's geometry and Webots' rule that a sonar gets no echo from a surface hit more than 22.5° off its normal.
+  - **What changes:** on a clear course the watch changes nothing, and the runs are step-for-step identical (`MissionTest`). With a box in the way it never touches the box. After stopping it skips to the next waypoint, as it does after a stall; it doesn't plan a way around yet.
 
 ---
 
@@ -219,7 +225,7 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 | Stale compiled controller | `ProjectController3.class` was committed. It was compiled from an older version of the source: it contains `findJar()`, `toStart()` and `hardcodedPath()`, which don't exist in the `.java`. Webots never compiles Java controllers by itself; it runs the `.class` it finds. So anyone who opened the repository ran that old code, not the source. | Deleted (still in git history) and `*.class` ignored. Build from source with `tools/build-controllers.sh` or Webots' Build button (the README now says so). |
 | Not a Webots project | Flat files. Webots looks for `controllers/<name>/` next to `worlds/`, and the world loads `../protos/*.proto`. | Standard `worlds/` + `controllers/` + `protos/` layout. |
 | Missing robot protos | The world needs `Pioneer3dx.proto` and `Pioneer3Gripper.proto`, which were never committed, so nobody else could open it. | Included in `protos/`, reconstructed from Webots R2021b. Every node type and field is checked statically against R2025a; not yet loaded in Webots. See [`protos/README.md`](../protos/README.md). |
-| No tests or CI | none | 131 JUnit tests (99% line coverage of v2's logic, 94% mutation score) and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and figures are up to date. |
+| No tests or CI | none | 137 JUnit tests (99% line coverage of v2's logic, 94% mutation score) and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and figures are up to date. |
 
 ---
 
@@ -227,15 +233,15 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 
 | | v1 | v2 |
 |---|---|---|
-| Layout | 1 file, 765 lines (574 of code), everything `static` | 14 focused files (13 classes and the `RobotPlatform` interface), 1,567 lines (1,108 of code; the rest is comments and blank lines) |
+| Layout | 1 file, 765 lines (574 of code), everything `static` | 14 focused files (13 classes and the `RobotPlatform` interface), 1,657 lines (1,164 of code; the rest is comments and blank lines) |
 | Webots API use | Spread through every method | Only in [`WebotsPlatform`](../controllers/JarCollectorV2/WebotsPlatform.java). Everything else uses the [`RobotPlatform`](../controllers/JarCollectorV2/RobotPlatform.java) interface, so it can be tested without Webots |
 | Tunable numbers | Literals scattered through methods | All in [`Config`](../controllers/JarCollectorV2/Config.java), each marked "v1" (unchanged) or "new" |
 | Waypoints | Rebuilt inline in 5 methods | Defined once, named, in [`Routes`](../controllers/JarCollectorV2/Routes.java) |
 | Duplicate code | Camera-to-array copy twice (lines 217-228, 300-311); position read 7 times | One `captureImage()`, one `positionCm()` |
 | Dead code | `WORLD_WIDTH`/`WORLD_HEIGHT`, blue-pixel counting, `GreenDetection.greenLeft/Center/Right`, `moveHardcodedAhead`'s always-`false` return, the 400-step limit | Removed |
 | Telemetry | Progress messages without times | Every log line has the simulated time, and each run ends with a mission report: time per phase, per-jar scans and approaches, stalls, timeouts |
-| Tests | 0 | 131, covering 99% of v2's logic lines (87% including the two classes that only run inside Webots) |
-| Mutation testing ([PIT](https://pitest.org/)) | n/a | 94% of injected bugs caught (360/381); at least 90% enforced in CI (`tools/mutation-test.sh`) |
+| Tests | 0 | 137, covering 99% of v2's logic lines (87% including the two classes that only run inside Webots) |
+| Mutation testing ([PIT](https://pitest.org/)) | n/a | 94% of injected bugs caught (376/400); at least 90% enforced in CI (`tools/mutation-test.sh`) |
 | Static analysis ([SpotBugs](https://spotbugs.github.io/), maximum effort, every priority) | 10 findings, all low severity: 5 unread fields, 3 `Math.floor` calls on constants, an int made via `nextDouble`, a field-naming slip | 0, enforced in CI (`tools/static-analysis.sh`) |
 
 ---
@@ -277,4 +283,4 @@ Each change is a constant in [`Config.java`](../controllers/JarCollectorV2/Confi
 
 The fixes for bugs 1-3, 8 and 10 have no switch, because they only change what happens when something has already gone wrong.
 
-Two v2 additions are **off by default** because they haven't been tried in Webots yet: the A*-planned routes (`USE_PLANNED_ROUTES`) and the grab check (`VERIFY_GRABS`).
+Three v2 additions are **off by default** because they haven't been tried in Webots yet: the A*-planned routes (`USE_PLANNED_ROUTES`), the grab check (`VERIFY_GRABS`) and the sonar watch (`SONAR_WATCH`).

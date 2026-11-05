@@ -29,6 +29,7 @@ public class BeforeAfterBenchmark {
     scan(md);
     drift(md);
     blocked(md);
+    boxInTheWay(md);
     approach(md);
     slippedGrab(md);
     failedSearch(md, WorldFile.read(world));
@@ -227,6 +228,30 @@ public class BeforeAfterBenchmark {
     row(md, "Drive blocked by an immovable obstacle after 1 m",
         s1 < 0 ? "never returns (still pushing after 20,000 steps)" : "returns after " + s1 + " steps",
         result + " after " + r2.stepsTaken() + " steps (" + f1(r2.elapsedMs() / 1000.0) + " s)");
+  }
+
+  /** A 30 cm box in the middle of a straight 3 m leg. */
+  private static void boxInTheWay(StringBuilder md) {
+    Vec2 box = Vec2.of(150, 0);
+    Vec2 target = Vec2.of(300, 0);
+    KinematicRobot r1 = robot(Vec2.of(0, 0), 0).withBox(box, 15);
+    int v1Steps = LegacyV1.moveHardcodedAhead(r1, 0, 0, target.x, target.y, 20_000);
+    KinematicRobot r2 = robot(Vec2.of(0, 0), 0).withBox(box, 15);
+    Navigator.DriveResult plain = new Navigator(r2, new MissionStats(r2::elapsedMs)).driveTo(target);
+    KinematicRobot r3 = robot(Vec2.of(0, 0), 0).withBox(box, 15);
+    Navigator.DriveResult watched =
+        new Navigator(r3, new MissionStats(r3::elapsedMs)).driveTo(target, true);
+    double gap = box.x - 15 - (r3.positionCm().x + 16.4);
+    row(md, "30 cm box in the middle of a straight 3 m leg",
+        "hits it at " + f0(r1.firstContactSpeedCmS) + " cm/s"
+            + (v1Steps < 0 ? " and keeps pushing (still at 20,000 steps)" : ""),
+        "default: hits it at " + f0(r2.firstContactSpeedCmS) + " cm/s, "
+            + plain.name().toLowerCase(Locale.ROOT).replace('_', ' ') + " after "
+            + f1(r2.elapsedMs() / 1000.0) + " s; with the sonar watch on (`Config.SONAR_WATCH`, "
+            + "off by default): " + (Double.isNaN(r3.firstContactSpeedCmS) ? "never touches it, "
+            : "touches it, ") + "stops " + f0(gap) + " cm short ("
+            + watched.name().toLowerCase(Locale.ROOT).replace('_', ' ') + ") after "
+            + f1(r3.elapsedMs() / 1000.0) + " s");
   }
 
   private static void approach(StringBuilder md) {

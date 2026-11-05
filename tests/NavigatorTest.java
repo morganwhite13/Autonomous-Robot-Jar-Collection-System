@@ -207,4 +207,60 @@ class NavigatorTest {
     nav(robot).turnTo(90, Config.MAX_SPEED);
     assertTrue(robot.isStopped());
   }
+
+  // Sonar watch (Config.SONAR_WATCH, off by default) and the model's sonar.
+
+  @Test
+  void sonarWatchStopsShortOfABoxInTheWay() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0).withBox(Vec2.of(150, 0), 15);
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    assertEquals(Navigator.DriveResult.OBSTACLE_AHEAD,
+        new Navigator(robot, stats).driveTo(Vec2.of(300, 0), true));
+    assertTrue(Double.isNaN(robot.firstContactSpeedCmS), "touched the box");
+    double sonarToBox = 135 - (robot.positionCm().x + 16.4);
+    assertTrue(sonarToBox > 20 && sonarToBox <= Config.SONAR_STOP_CM, "gap " + sonarToBox);
+    assertEquals(1, stats.obstacleStops());
+    assertTrue(robot.isStopped());
+  }
+
+  @Test
+  void withoutTheSonarWatchTheSameBoxIsHitAtFullSpeed() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0).withBox(Vec2.of(150, 0), 15);
+    assertEquals(Navigator.DriveResult.STALLED, nav(robot).driveTo(Vec2.of(300, 0)));
+    assertEquals(Config.MAX_SPEED * KinematicRobot.WHEEL_RADIUS_CM, robot.firstContactSpeedCmS,
+        1e-9);
+  }
+
+  @Test
+  void sonarWatchSlowsDownInProportionToTheGap() {
+    // Both beams start 62.5 cm from the box face: halfway between the slow and stop distances.
+    double face = 16.4 + 62.5 * Math.cos(Math.toRadians(10));
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0)
+        .withBox(Vec2.of(face + 50, 0), 50).withStepLimit(0);
+    assertEquals(62.5, robot.frontObstacleCm(), 1e-9);
+    assertThrows(RobotPlatform.SimulationEnded.class,
+        () -> nav(robot).driveTo(Vec2.of(300, 0), true));
+    double half = Config.MAX_SPEED * (62.5 - Config.SONAR_STOP_CM)
+        / (Config.SONAR_SLOW_CM - Config.SONAR_STOP_CM);
+    assertArrayEquals(new double[] {half, half}, robot.lastCommand(), 1e-9);
+  }
+
+  @Test
+  void sonarWatchIgnoresObstaclesBeyondTheWaypoint() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0).withBox(Vec2.of(150, 0), 15);
+    assertEquals(Navigator.DriveResult.ARRIVED, nav(robot).driveTo(Vec2.of(100, 0), true));
+    assertEquals(100, robot.positionCm().x, 2);
+  }
+
+  @Test
+  void modelSonarHearsFacingSurfacesButNotGlancingOnes() {
+    // A 1 m wide box whose face is 180 cm ahead: both beams (10 deg either side) hit the face.
+    KinematicRobot facing = new KinematicRobot(Vec2.of(0, 0), 0).withBox(Vec2.of(230, 0), 50);
+    assertEquals(Double.POSITIVE_INFINITY,
+        new KinematicRobot(Vec2.of(0, 0), 0).frontObstacleCm());
+    assertEquals((180 - 16.4) / Math.cos(Math.toRadians(10)), facing.frontObstacleCm(), 1e-9);
+    // A long wall parallel to the path: every beam meets it at a glancing angle, so no echo.
+    KinematicRobot wall = new KinematicRobot(Vec2.of(0, 0), 0).withBox(Vec2.of(0, 1030), 1000);
+    assertEquals(Double.POSITIVE_INFINITY, wall.frontObstacleCm());
+  }
 }

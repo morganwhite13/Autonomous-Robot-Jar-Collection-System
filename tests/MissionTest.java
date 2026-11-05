@@ -179,4 +179,15 @@ class MissionTest {
       }
     }
   }
+
+  @Test
+  void sonarWatchChangesNothingOnAClearCourse() {
+    KinematicRobot off = robotWithJars();
+    new Mission(off).run();
+    KinematicRobot on = robotWithJars();
+    Mission watched = new Mission(on, new Mission.Options().sonarWatch(true));
+    assertEquals(5, watched.run());
+    assertEquals(off.stepsTaken(), on.stepsTaken());
+    assertEquals(0, watched.stats().obstacleStops());
+  }
 }

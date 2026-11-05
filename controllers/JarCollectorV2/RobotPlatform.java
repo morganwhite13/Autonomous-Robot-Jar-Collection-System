@@ -52,6 +52,15 @@ interface RobotPlatform {
   void setLift(double position);
 
   /**
+   * Distance in cm from the two front sonars (so3 and so4, 16 cm ahead of the centre, pointing
+   * 10 degrees left and right) to the nearest echo. Infinity if nothing is in range or the robot
+   * has no sonars.
+   */
+  default double frontObstacleCm() {
+    return Double.POSITIVE_INFINITY;
+  }
+
+  /**
    * How hard the fingers are squeezing, as a fraction of the finger motors' maximum force: about 1
    * when they have closed on a jar, about 0 when they closed on nothing. NaN if it can't be
    * measured, which the grab check treats as "holding".

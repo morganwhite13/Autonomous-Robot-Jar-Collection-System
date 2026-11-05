@@ -140,6 +140,19 @@ final class WebotsPlatform implements RobotPlatform {
     lift.setPosition(position);
   }
 
+  /** Pioneer3DistanceSensor lookupTable: 1024 at 0 m down to 0 at 5 m, linear. */
+  private static final double SONAR_MAX_VALUE = 1024;
+  private static final double SONAR_RANGE_CM = 500;
+
+  @Override
+  public double frontObstacleCm() {
+    double value = Math.max(leftAhead.getValue(), rightAhead.getValue()); // higher = closer
+    if (!(value > 0)) {
+      return Double.POSITIVE_INFINITY;
+    }
+    return SONAR_RANGE_CM * (1 - Math.min(value, SONAR_MAX_VALUE) / SONAR_MAX_VALUE);
+  }
+
   @Override
   public double gripEffort() {
     double max = Math.min(leftFinger.getMaxForce(), rightFinger.getMaxForce());
