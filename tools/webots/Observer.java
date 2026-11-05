@@ -28,7 +28,8 @@ public class Observer {
     Path outDir = Paths.get(args.length > 0 ? args[0] : ".");
     double limitS = args.length > 1 ? Double.parseDouble(args[1]) : 3600;
 
-    Field robot = supervisor.getFromDef("ROBOT").getField("translation");
+    Node robotNode = supervisor.getFromDef("ROBOT");
+    Field robot = robotNode.getField("translation");
     List<Field> jars = new ArrayList<>();
     for (Node jar = supervisor.getFromDef("JAR0"); jar != null;
         jar = supervisor.getFromDef("JAR" + jars.size())) {
@@ -40,8 +41,11 @@ public class Observer {
     double time = 0;
     boolean ended = false;
     try (PrintWriter path = new PrintWriter(
-        Files.newBufferedWriter(outDir.resolve("trajectory.csv"), StandardCharsets.UTF_8))) {
+        Files.newBufferedWriter(outDir.resolve("trajectory.csv"), StandardCharsets.UTF_8));
+        PrintWriter poses = new PrintWriter(
+            Files.newBufferedWriter(outDir.resolve("poses.csv"), StandardCharsets.UTF_8))) {
       path.println("t,x,y");
+      poses.println("t,x,y,heading"); // heading in degrees, as the controllers' compass gives it
       double nextSample = 0;
       int lastReported = 0;
       while (true) {
@@ -53,6 +57,11 @@ public class Observer {
         double[] r = robot.getSFVec3f();
         if (time >= nextSample) {
           path.printf(Locale.ROOT, "%.2f,%.1f,%.1f%n", time, r[0] * 100, -r[2] * 100);
+          // The robot drives along its local -Z: in the world that is minus the third column.
+          double[] m = robotNode.getOrientation();
+          double heading = Math.toDegrees(Math.atan2(m[8], -m[2])); // controllers' y is -Z
+          poses.printf(Locale.ROOT, "%.2f,%.1f,%.1f,%.1f%n", time, r[0] * 100, -r[2] * 100,
+              heading);
           nextSample += 0.5;
         }
         for (int i = 0; i < jars.size(); i++) {
