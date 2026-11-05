@@ -47,3 +47,56 @@ jobs:
       - name: Mutation testing (PIT; at least 90% of changes must be caught)
         if: matrix.java == '21'
         run: tools/mutation-test.sh
+
+  webots:
+    name: Whole mission in Webots (v2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Webots R2025a
+        id: webots-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/webots
+          key: webots-R2025a-x86-64
+
+      - name: Download Webots R2025a
+        if: steps.webots-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL --retry 3 -o /tmp/webots.tar.bz2 \
+            https://github.com/cyberbotics/webots/releases/download/R2025a/webots-R2025a-x86-64.tar.bz2
+          tar -xjf /tmp/webots.tar.bz2 -C ~
+
+      - name: Install what Webots needs to run headless
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libglu1-mesa libegl1 libxcb-util1 libxcb-xkb1 \
+            libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-xinerama0 libxcb-xinput0 libxcb-cursor0
+
+      - name: Run v2's whole mission in Webots
+        run: WEBOTS_HOME=~/webots tools/run-in-webots.sh --limit 1500 --out build/ci-webots v2
+
+      - name: Every jar was delivered
+        run: |
+          cat build/ci-webots/v2/result.properties
+          grep -qx 'delivered=5' build/ci-webots/v2/result.properties
+
+      - name: Keep the run's log and paths
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webots-v2-run
+          path: |
+            build/ci-webots/report.md
+            build/ci-webots/paths.svg
+            build/ci-webots/v2/webots.log
+            build/ci-webots/v2/result.properties
+            build/ci-webots/v2/trajectory.csv

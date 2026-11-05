@@ -19,6 +19,9 @@
 #                          running several at once (tools/webots-sweep.sh does)
 #          --set NAME=VAL  change one of v2's Config constants for these runs, e.g.
 #                          --set SONAR_WATCH=true (repeatable; the source isn't modified)
+#          --frames S      also save a top-down picture of the arena every S simulated seconds to
+#                          build/webots-run/<version>/frames/ (tools/make-demo-gif.sh turns them
+#                          into a GIF); slows the run down
 #
 # Each run gets a temporary copy of the project under build/webots-run/<version>/. The copy's
 # world adds an invisible "observer" supervisor (tools/webots/Observer.java) that records the
@@ -39,6 +42,7 @@ SEED=0
 PORT=1234
 RUN_ROOT="build/webots-run"
 SETTINGS=()
+FRAMES=""
 VERSIONS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -47,6 +51,7 @@ while [ $# -gt 0 ]; do
     --out) RUN_ROOT="$2"; shift 2 ;;
     --port) PORT="$2"; shift 2 ;;
     --set) SETTINGS+=("$2"); shift 2 ;;
+    --frames) FRAMES="$2"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --watch) WATCH=1; shift ;;
     v1|v2|v2-planned) VERSIONS+=("$1"); shift ;;
@@ -126,6 +131,12 @@ for version in "${VERSIONS[@]}"; do
     done
   fi
   cp tools/webots/Observer.java tools/webots/DeliveryTracker.java "$dir/controllers/Observer/"
+  helpers=(Observer)
+  if [ -n "$FRAMES" ]; then
+    mkdir -p "$dir/controllers/Recorder" "$dir/frames"
+    cp tools/webots/Recorder.java "$dir/controllers/Recorder/"
+    helpers+=(Recorder)
+  fi
   out_abs="$(cd "$dir" && pwd)"
 
   # Name the robot and jars so the observer can find them, and add the observer node.
@@ -144,10 +155,31 @@ for version in "${VERSIONS[@]}"; do
   if [ "$SEED" != 0 ]; then
     java -cp "$TOOLS" WorldShuffle "$dir/worlds/$world" "$SEED" | sed 's/^/    /'
   fi
+  if [ -n "$FRAMES" ]; then
+    # A camera 15 m above the middle of the northern part of the arena (the part the mission
+    # uses), looking straight down with north up.
+    cat >> "$dir/worlds/$world" <<WORLD
+Robot {
+  translation 0 15 -3.85
+  name "recorder"
+  controller "Recorder"
+  controllerArgs [ "$out_abs/frames" "$FRAMES" ]
+  children [
+    Camera {
+      rotation 0.70711 -0.70711 0 3.14159
+      name "arena camera"
+      fieldOfView 1.176
+      width 640
+      height 400
+    }
+  ]
+}
+WORLD
+  fi
 
   # Compile the controllers up front (what Webots' Build button does) so a compile error
   # shows up here rather than as a silent controller crash.
-  for c in "$controller" Observer; do
+  for c in "$controller" "${helpers[@]}"; do
     (cd "$dir/controllers/$c" && javac -nowarn -encoding UTF-8 -cp "$CONTROLLER_JAR:." ./*.java)
   done
 

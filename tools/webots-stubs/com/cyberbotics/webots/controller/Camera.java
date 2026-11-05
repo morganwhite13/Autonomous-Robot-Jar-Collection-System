@@ -9,6 +9,7 @@ public class Camera extends Device {
   public int[] getImage() { return new int[0]; }
   public int getWidth() { return 0; }
   public int getHeight() { return 0; }
+  public int saveImage(String filename, int quality) { return 0; }
   public static int imageGetRed(int[] image, int width, int x, int y) { return 0; }
   public static int imageGetGreen(int[] image, int width, int x, int y) { return 0; }
   public static int imageGetBlue(int[] image, int width, int x, int y) { return 0; }
