@@ -26,6 +26,6 @@ The world uses the old `NUE` coordinate system (Y up). Today's Webots Pioneer pr
 - **Checked statically against Webots R2025a.** Every node type the three files use (40 in total) exists in R2025a's node definitions (`resources/nodes/*.wrl`), and so does every field they set. R2025a's `WorldInfo` still accepts `coordinateSystem "NUE"`. All 19 `webots://` texture paths exist in the R2025a release.
 - **Not yet loaded in Webots.** Webots could not be launched in the environment where they were added. If the robot doesn't appear or behaves oddly, replace these files with the originals from the project folder you first ran it in (plus any `.proto` they reference).
 
-## Licence
+## License
 
-The files keep their original header: "Copyright Cyberbotics Ltd. Licensed for use only with Webots." This repository is a Webots project and uses them only with Webots.
+The files keep their original header: "Copyright Cyberbotics Ltd. Licensed for use only with Webots." This repository is a Webots project and uses them only with Webots. They are excluded from the repository's MIT license.

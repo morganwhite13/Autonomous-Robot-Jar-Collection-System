@@ -15,7 +15,7 @@ This repository holds **two versions side by side**:
 
 👉 **[Full before/after write-up](docs/BEFORE_AND_AFTER.md)**: each fix with the original line numbers, plus [measured results](docs/benchmark-results.md).
 
-**Contents:** [Video demos](#-video-demos-v1) · [Before and after](#️-before-and-after-at-a-glance) · [The mission](#️-the-mission) · [How it works](#️-how-it-works) · [Running it](#-running-it) · [Repository layout](#-repository-layout) · [What I learned](#-what-i-learned) · [Future improvements](#-future-improvements) · [Contact](#-contact)
+**Contents:** [Video demos](#-video-demos-v1) · [Before and after](#️-before-and-after-at-a-glance) · [The mission](#️-the-mission) · [How it works](#️-how-it-works) · [Running it](#-running-it) · [Repository layout](#-repository-layout) · [What I learned](#-what-i-learned) · [Future improvements](#-future-improvements) · [License](#-license) · [Contact](#-contact)
 
 ---
 
@@ -319,6 +319,12 @@ docs/
 - **Cyberbotics**: comprehensive documentation and community support
 - **Java community**: robust cross-platform development tools
 - **Pioneer 3-DX community**: reference implementations and best practices
+
+---
+
+## 📄 License
+
+[MIT](LICENSE), except the robot model files in [`protos/`](protos/README.md), which are Cyberbotics' and licensed for use only with Webots.
 
 ---
 
