@@ -208,7 +208,7 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 
 | | v1 | v2 |
 |---|---|---|
-| Layout | 1 file, 765 lines (574 of code), everything `static` | 13 focused classes, 1,293 lines (923 of code; the rest is comments and blank lines) |
+| Layout | 1 file, 765 lines (574 of code), everything `static` | 14 focused files (13 classes and the `RobotPlatform` interface), 1,326 lines (943 of code; the rest is comments and blank lines) |
 | Webots API use | Spread through every method | Only in [`WebotsPlatform`](../controllers/JarCollectorV2/WebotsPlatform.java). Everything else uses the [`RobotPlatform`](../controllers/JarCollectorV2/RobotPlatform.java) interface, so it can be tested without Webots |
 | Tunable numbers | Literals scattered through methods | All in [`Config`](../controllers/JarCollectorV2/Config.java), each marked "v1" (unchanged) or "new" |
 | Waypoints | Rebuilt inline in 5 methods | Defined once, named, in [`Routes`](../controllers/JarCollectorV2/Routes.java) |
