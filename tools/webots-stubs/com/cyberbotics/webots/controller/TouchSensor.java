@@ -1,9 +1,10 @@
 package com.cyberbotics.webots.controller;
 
 // Compile-only stub of the Webots R2025a Java API (signatures from javap on Controller.jar).
-// Lets CI type-check WebotsPlatform without a Webots install. Never used at runtime.
+// Lets CI type-check and analyse the controllers without a Webots install. Never run:
+// methods return neutral values so static analysis sees the same flow as with the real API.
 public class TouchSensor extends Device {
   public TouchSensor(String name) {}
-  public void enable(int samplingPeriod) { throw new UnsupportedOperationException("Webots API stub"); }
-  public double getValue() { throw new UnsupportedOperationException("Webots API stub"); }
+  public void enable(int samplingPeriod) { }
+  public double getValue() { return 0; }
 }

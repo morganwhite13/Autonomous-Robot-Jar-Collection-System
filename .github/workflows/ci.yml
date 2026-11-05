@@ -20,18 +20,18 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
 
-      - name: Cache JUnit download
+      - name: Cache tool downloads (JUnit, SpotBugs)
         uses: actions/cache@v4
         with:
           path: build/lib
-          key: junit-console-1.10.2
+          key: build-lib-jdk${{ matrix.java }}-junit-1.10.2-spotbugs-4.8.6
 
       - name: Compile both controllers, run tests, regenerate docs
         run: tools/run-tests.sh
 
       - name: Generated docs match the code
         if: matrix.java == '21'
-        run: git diff --exit-code -- docs/benchmark-results.md docs/images/mission-map.svg docs/images/before-after.svg
+        run: git diff --exit-code -- docs/benchmark-results.md docs/images/mission-map.svg docs/images/before-after.svg docs/images/before-after-dark.svg
 
       - name: Webots comparison builds (dry run, no Webots needed)
         run: tools/run-in-webots.sh --dry-run
@@ -39,3 +39,7 @@ jobs:
       - name: Lint shell scripts
         if: matrix.java == '21'
         run: shellcheck tools/*.sh
+
+      - name: Static analysis (SpotBugs; v2 must have no findings)
+        if: matrix.java == '21'
+        run: tools/static-analysis.sh
