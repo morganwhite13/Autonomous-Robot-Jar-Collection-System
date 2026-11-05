@@ -64,15 +64,19 @@ public class MapRenderer {
     return points;
   }
 
-  /** Paths driven in Webots, one colour per run, over the arena. */
+  /** Paths driven in Webots, one colour per run, over the arena, with where each run ended. */
   String renderPaths(WorldFile world, Map<String, List<Vec2>> paths) {
     return renderPaths(world, paths, Collections.emptyList(), "Paths driven in Webots",
-        "Cardboard box: pushable (start positions)");
+        "Cardboard box: pushable (start positions)", true);
   }
 
-  /** Paths over the arena, leaving out {@code hiddenBoxes}, with the given title and box legend. */
+  /**
+   * Paths over the arena, leaving out {@code hiddenBoxes}, with the given title and box legend.
+   * With {@code markEnds}, a dot in each path's colour marks its last point.
+   */
   String renderPaths(WorldFile world, Map<String, List<Vec2>> paths,
-      Collection<WorldFile.Obstacle> hiddenBoxes, String title, String cardboardLegend) {
+      Collection<WorldFile.Obstacle> hiddenBoxes, String title, String cardboardLegend,
+      boolean markEnds) {
     hidden = hiddenBoxes;
     open(title, new String[0][]);
     drawObstacles(world);
@@ -87,6 +91,17 @@ public class MapRenderer {
           pts.toString().trim(), PATH_COLORS[i++ % PATH_COLORS.length]);
     }
     drawMarkers(world);
+    if (markEnds) {
+      i = 0;
+      for (List<Vec2> path : paths.values()) {
+        String color = PATH_COLORS[i++ % PATH_COLORS.length];
+        if (!path.isEmpty()) {
+          Vec2 end = path.get(path.size() - 1);
+          add("<circle cx=\"%.1f\" cy=\"%.1f\" r=\"16\" fill=\"%s\" stroke=\"#ffffff\" "
+              + "stroke-width=\"5\"/>", sx(end.x), sy(end.y), color);
+        }
+      }
+    }
     add("</g>");
     double y = MAX_Y - MIN_Y + 60;
     i = 0;
@@ -95,6 +110,12 @@ public class MapRenderer {
           y, y, PATH_COLORS[i++ % PATH_COLORS.length]);
       add("<text x=\"140\" y=\"%.0f\" font-size=\"34\" fill=\"#212529\">%s</text>", y + 12, e.getKey());
       y += 48;
+    }
+    if (markEnds) {
+      add("<circle cx=\"75\" cy=\"%.0f\" r=\"14\" fill=\"#868e96\" stroke=\"#ffffff\" "
+          + "stroke-width=\"4\"/>", y);
+      add("<text x=\"140\" y=\"%.0f\" font-size=\"34\" fill=\"#212529\">Where the run ended</text>",
+          y + 12);
     }
     obstacleLegend(1060, MAX_Y - MIN_Y + 60, cardboardLegend);
     add("</svg>");
@@ -287,11 +308,11 @@ public class MapRenderer {
         sx(x), sy(y), color, anchor, text);
   }
 
-  private static double sx(double x) {
+  static double sx(double x) {
     return x - MIN_X;
   }
 
-  private static double sy(double y) {
+  static double sy(double y) {
     return MAX_Y - y;
   }
 

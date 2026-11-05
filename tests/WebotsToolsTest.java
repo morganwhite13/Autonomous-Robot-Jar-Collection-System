@@ -99,6 +99,11 @@ class WebotsToolsTest {
     assertEquals(2, svg.split("<polyline", -1).length - 1);
     assertTrue(svg.contains("v1 (before)") && svg.contains("v2 (after)"));
     assertFalse(svg.contains("arrow-clear"), "planned routes are not drawn");
+    // A dot where each run ended, so a run that got stuck shows where.
+    assertTrue(svg.contains(String.format(java.util.Locale.ROOT, "cx=\"%.1f\" cy=\"%.1f\" r=\"16\"",
+        MapRenderer.sx(100), MapRenderer.sy(0))), "v1 end");
+    assertEquals(2, svg.split("r=\"16\"", -1).length - 1);
+    assertTrue(svg.contains("Where the run ended"));
   }
 
   private void writeRun(String name, String result, String log) throws Exception {

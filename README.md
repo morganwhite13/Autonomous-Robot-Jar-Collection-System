@@ -36,7 +36,8 @@ This repository holds **two versions side by side**:
 
 | | v1 (before) | v2 (after) |
 |---|---|---|
-| Whole mission on the robot model | Never finishes on any of 20 robot variants (at most 2 of 5 jars delivered): it gets stuck turning back and forth, or drifts into a wooden box and pushes against it | Delivers all 5 on all 20 variants, in 807-902 s |
+| **Whole mission in Webots** (real physics) | **0 of 5 jars delivered**. It aims at the floor and walls (its green test counts them), closes its gripper on nothing three times and counts each as a delivery, then gets stuck against a wooden box from 745 s until the run is stopped | **All 5 delivered in 879 s** (14.7 min), with no stalls, timeouts or failed searches |
+| Whole mission on the robot model | Never finishes on any of 20 robot variants (at most 2 of 5 jars delivered): it gets stuck turning back and forth, or drifts into a wooden box and pushes against it | Delivers all 5 on all 20 variants, in 873-1005 s |
 | After a failed search for jars 2-5 | Drives a 17.8 m straight line through 4 immovable wooden boxes | Returns 0.8 m to the search point |
 | Robot blocked while driving | Pushes forever | Detects the stall in ~4 s and moves on |
 | "360°" jar scan | Covers ~271° (fixed 200 steps); 188° with wheel slip | Covers 370°, measured by the compass, with or without slip |
@@ -44,15 +45,22 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 137 JUnit tests covering 99% of v2's logic and catching 94% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
+| Carrying a jar | Turns at full speed, which throws the jar out in Webots | Turns at a third of full speed while carrying |
+| Tests / CI | none | 141 JUnit tests covering 99% of v2's logic and catching 94% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
-The numbers come from running ports of v1's methods and the real v2 classes on the same kinematic model of the robot. **Neither version has been re-run in Webots since the rewrite**; see [how it was checked](docs/BEFORE_AND_AFTER.md#how-this-was-checked-and-what-still-needs-checking).
+The Webots row comes from running both controllers headless in Webots R2025a on the same world, with one observer judging both ([results](docs/webots-results.md), [what happened](docs/BEFORE_AND_AFTER.md#measured-in-webots)). The robot protos are reconstructions, because the originals were never committed. The other rows come from running ports of v1's methods and the real v2 classes on the same kinematic model of the robot.
+
+### In Webots
+
+![Paths driven in Webots R2025a: v1 in orange ends at the corner of a wooden box beside the jar bay; v2 in blue makes five round trips between the jar bay and the drop-off, as does v2 with planned routes in green](docs/images/webots-paths.svg)
+
+v1 (orange) turns towards the wrong things and makes three trips to the drop-off with an empty gripper. After a failed search it heads off along the route meant for the drop-off end, and gets stuck against the corner of a wooden box (the orange dot) from 745 s. v2 (blue) clears the boxes, then makes five round trips and delivers every jar. With its opt-in A*-planned routes (green) it finishes 10% sooner, in 788 s. Its first Webots runs still lost each jar on the first turn after grabbing it. That was fixed by turning more gently while carrying ([bug 11](docs/BEFORE_AND_AFTER.md#11-full-speed-turns-threw-the-jar-out-of-the-gripper-found-in-webots)).
 
 ### Both versions running the whole mission
 
-![Animated replay of v1 and v2 running the whole mission on the robot model: v1 drifts off its route while clearing boxes and pushes against a wooden box from 47 s; v2 delivers all five jars in 864 s](docs/images/mission-replay.svg)
+![Animated replay of v1 and v2 running the whole mission on the robot model: v1 drifts off its route while clearing boxes and pushes against a wooden box from 47 s; v2 delivers all five jars in 957 s](docs/images/mission-replay.svg)
 
 A replay at 30x speed, on the robot model with motor lag and wheel slip. v1 never steers on a leg, so it drifts off its route while clearing boxes. At 47 s it drives into a wooden box and, with no stall detection, pushes against it for the rest of the run. v2 delivers all five jars. Generated from the same runs as the benchmark by `tools/MissionReplay.java`.
 
@@ -166,24 +174,29 @@ flowchart TB
 
 Because the mission logic only talks to `RobotPlatform`, the tests can run it against [`KinematicRobot`](tests/KinematicRobot.java), a differential-drive model with a synthetic camera, without Webots.
 
-At the end of every run v2 prints a report like this one (this example is from the kinematic model, so the times will differ in Webots):
+At the end of every run v2 prints a report. This one is from the Webots run above:
 
 ```
 ==================== MISSION REPORT (v2) ====================
-Result: 5/5 jars delivered in 814.9 s of simulated time
+Result: 5/5 jars delivered in 882.2 s of simulated time
 
 Time by phase (summed over all jars)
   Start-up                      1.3 s
-  Clearing path                89.1 s
-  Travel to search point      234.8 s
-  Search and grab             168.7 s
-  Carry to drop-off           284.4 s
-  Place jar                    36.4 s
+  Clearing path                90.1 s
+  Travel to search point      237.9 s
+  Search and grab             167.5 s
+  Carry to drop-off           341.2 s
+  Place jar                    44.2 s
 
 Jar   Time (s)  Scans  Approaches  Result
-  1       86.8      1           1  delivered
-  ...
-Anomalies: drive stalls=0, drive timeouts=0, turn timeouts=0, failed searches=0
+  1       99.8      1           1  delivered
+  2      163.7      1           1  delivered
+  3      174.3      1           1  delivered
+  4      175.1      1           1  delivered
+  5      177.8      1           1  delivered
+
+Anomalies: drive stalls=0, drive timeouts=0, turn timeouts=0, failed searches=0, missed grabs=0, sonar stops=0
+==============================================================
 ```
 
 ---
@@ -194,7 +207,7 @@ Anomalies: drive stalls=0, drive timeouts=0, turn timeouts=0, failed searches=0
 - **[Webots R2025a](https://cyberbotics.com/)**
 - **JDK 11 or newer** on your `PATH`
 
-The robot protos the world needs are included in `protos/`. They are reconstructed from Webots R2021b and checked statically against R2025a, but haven't been loaded in Webots yet. If the robot doesn't appear, see [`protos/README.md`](protos/README.md).
+The robot protos the world needs are included in `protos/`. They are reconstructed from Webots R2021b and run in Webots R2025a, which converts them on load. Keep their R2021b header; [`protos/README.md`](protos/README.md) explains why.
 
 ### In Webots
 1. `git clone https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System.git`
@@ -214,7 +227,7 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 137 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 141 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
@@ -305,24 +318,23 @@ docs/
 ## 🔮 Future improvements
 
 ### Next, following on from v2
-1. Run both versions in Webots (`tools/run-in-webots.sh`) and publish the results
-2. Confirm the reconstructed robot protos load in Webots (or swap in the originals)
-3. Tune and switch on the sonar watch, which stops short of obstacles in the way instead of noticing a stall afterwards. It's built and tested on the robot model (`Config.SONAR_WATCH`). After stopping it skips to the next waypoint like a stall does; planning a way around the obstacle would be the step after.
-4. Calibrate and switch on the grab check (`Config.VERIFY_GRABS`) from the grip effort v2 logs after each lift
+1. Tune and switch on the sonar watch (`Config.SONAR_WATCH`), which stops short of obstacles in the way instead of noticing a stall afterwards. It's built and tested on the robot model but not yet tried in Webots. After stopping it skips to the next waypoint; planning a way around is the step after.
+2. Switch on the grab check (`Config.VERIFY_GRABS`). Its threshold is calibrated from the Webots run's grip efforts, but no real grab has missed yet, so it has never had to act.
+3. Make the A*-planned routes the default once they've had more runs. They delivered all five jars 10% sooner in Webots.
 
 ### Original roadmap
-5. **Dynamic pathfinding**: replace hardcoded waypoints with A* or Dijkstra. *Started:* [an A* analysis](docs/route-planner.md) finds routes about 13-14% shorter than the hand-tuned ones after the clearing phase (and no route at all without it). v2 can use them via `Config.USE_PLANNED_ROUTES`, off by default; on the robot model the mission finishes about 9% sooner
-6. **Obstacle mapping**: build a real-time obstacle map from the distance sensors
-7. **Machine learning**: train a CNN for robust detection in variable lighting
-8. **Configuration file**: externalise parameters. *Partly done: v2 gathers them all in `Config.java`*
-9. **SLAM**: simultaneous localisation and mapping for unknown environments
-10. **Multi-robot coordination**: swarm behaviour for collaborative collection
-11. **Reinforcement learning**: let an agent optimise its behaviour through trial and error
-12. **Web dashboard**: real-time monitoring of the robot's state
-13. **Real hardware**: port to an actual Pioneer 3-DX or mobile manipulator
-14. **Force-feedback gripper**: pressure sensing for delicate objects
-15. **Behaviour trees**: more sophisticated state management
-16. **ROS 2 integration**: compatibility with the wider robotics ecosystem
+4. **Dynamic pathfinding**: replace hardcoded waypoints with A* or Dijkstra. *Started:* [an A* analysis](docs/route-planner.md) finds routes about 13-14% shorter than the hand-tuned ones after the clearing phase (and no route at all without it). v2 can use them via `Config.USE_PLANNED_ROUTES`, off by default. The mission finishes about 10% sooner, both on the robot model and in Webots (788 s instead of 879 s)
+5. **Obstacle mapping**: build a real-time obstacle map from the distance sensors
+6. **Machine learning**: train a CNN for robust detection in variable lighting
+7. **Configuration file**: externalise parameters. *Partly done: v2 gathers them all in `Config.java`*
+8. **SLAM**: simultaneous localisation and mapping for unknown environments
+9. **Multi-robot coordination**: swarm behaviour for collaborative collection
+10. **Reinforcement learning**: let an agent optimise its behaviour through trial and error
+11. **Web dashboard**: real-time monitoring of the robot's state
+12. **Real hardware**: port to an actual Pioneer 3-DX or mobile manipulator
+13. **Force-feedback gripper**: pressure sensing for delicate objects
+14. **Behaviour trees**: more sophisticated state management
+15. **ROS 2 integration**: compatibility with the wider robotics ecosystem
 
 ---
 

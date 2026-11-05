@@ -20,8 +20,9 @@ final class Config {
   static final long RANDOM_SEED = 2025L;
   /**
    * new, off by default: carry and return along the shorter A*-planned routes
-   * ({@link Routes#PLANNED}) instead of v1's hand-tuned ones. Untested in Webots; try it with
-   * tools/run-in-webots.sh v2-planned.
+   * ({@link Routes#PLANNED}) instead of v1's hand-tuned ones. In Webots this delivered all five
+   * jars in 788 s instead of 879 s (tools/run-in-webots.sh v2-planned). Off by default so that v2
+   * keeps every one of v1's waypoints.
    */
   static final boolean USE_PLANNED_ROUTES = false;
   /** v1 printed front-sonar readings 10 times at start-up; v2 prints one line. */
@@ -158,8 +159,9 @@ final class Config {
   /**
    * new, off by default: after lifting, check that the fingers are squeezing something and
    * release and try again if not. v1 printed "Verifying grab..." but checked nothing, so a jar
-   * that slipped out was "delivered" anyway. Off until a Webots run confirms the threshold below;
-   * every grab logs its grip effort either way.
+   * that slipped out was "delivered" anyway. Every grab logs its grip effort either way: in
+   * Webots, real grabs measured 1.00 and a jar thrown out of the gripper dropped it to 0. Off by
+   * default because no real grab has missed yet, so it has never had to act.
    */
   static final boolean VERIFY_GRABS = false;
   /**

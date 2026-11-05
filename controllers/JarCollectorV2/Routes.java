@@ -77,7 +77,8 @@ final class Routes {
    * shortest routes found by the A* planner in tools/RoutePlanner.java, keeping the same 35 cm
    * clearance, assuming the boxes the clearing route sweeps past end up out of the way. The
    * carry route still leaves the jar bay through (850, 100). About 13-14% shorter than the
-   * hand-tuned routes; untested in Webots. RoutePlannerTest checks these still match the planner.
+   * hand-tuned routes; in Webots the mission finished 10% sooner on them. RoutePlannerTest checks
+   * these still match the planner.
    */
   static final List<Vec2> PLANNED_SEARCH_TO_DROPOFF = List.of(
       Vec2.of(850, 100),

@@ -99,7 +99,8 @@ public class RoutePlannerReport {
     paths.put("Hand-tuned carry route (v1 = v2)", withStart(search, handCarry));
     paths.put("A* carry route after clearing", withStart(search, carry));
     String svg = new MapRenderer().renderPaths(world, paths, swept,
-        "Hand-tuned vs planned carry route", "Cardboard box the clearing route doesn't reach");
+        "Hand-tuned vs planned carry route", "Cardboard box the clearing route doesn't reach",
+        false);
     Files.write(Path.of(args[2]), svg.getBytes(StandardCharsets.UTF_8));
   }
 
