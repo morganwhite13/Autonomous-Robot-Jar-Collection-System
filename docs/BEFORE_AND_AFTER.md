@@ -18,7 +18,7 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 
 **Done:**
 - Both controllers compile against the real Webots R2025a `Controller.jar`. CI compiles them against API stubs whose signatures were copied from that jar.
-- 117 JUnit tests, covering 99% of the lines in v2's logic (measured with `tools/run-tests.sh --coverage`). Most run v2's real navigation, search and mission classes on a kinematic model of the Pioneer 3-DX (wheel radius 9.75 cm, axle track 33 cm, 32 ms steps, synthetic 64x64 camera). A small scripted fake covers the edge cases the model can't stage, such as exact pixel counts or the bumper pressing mid-pause.
+- 121 JUnit tests, covering 99% of the lines in v2's logic (measured with `tools/run-tests.sh --coverage`). Most run v2's real navigation, search and mission classes on a kinematic model of the Pioneer 3-DX (wheel radius 9.75 cm, axle track 33 cm, 32 ms steps, synthetic 64x64 camera). A small scripted fake covers the edge cases the model can't stage, such as exact pixel counts or the bumper pressing mid-pause.
 - Mutation testing (`tools/mutation-test.sh`, [PIT](https://pitest.org/)): of 369 small deliberate bugs injected into v2's logic, the tests catch 349 (95%). The first run caught only 56%, even with 96% line coverage, which is what prompted most of the tests above. The 20 that survive were each checked by hand. 8 can't change behaviour, such as `d < 0` vs `d <= 0` before a wrap-around that maps 360 back to 0. 6 only change log text. 6 only differ when a measured distance or angle lands exactly on a threshold, like 2.000… cm of progress. CI fails below 90%.
 - Refactors are checked against a recorded baseline: full mission logs from 6 scenarios (ideal model, planned routes, motor lag and wheel slip, one jar, no jars, blocked start) plus every way an approach can end. The logs, timings, positions and wheel commands must match the previous version exactly.
 - The v1 methods being compared, and v1's whole mission loop, were ported line for line into [`tests/LegacyV1.java`](../tests/LegacyV1.java) and [`tests/LegacyV1Mission.java`](../tests/LegacyV1Mission.java) and measured on the same model ([`docs/benchmark-results.md`](benchmark-results.md)). [`LegacyBehaviourTest`](../tests/LegacyBehaviourTest.java) pins each v1 behaviour described here, so the claims fail loudly if they stop being true.
@@ -60,6 +60,8 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 **The whole-mission rows** run a line-for-line port of v1's `main` loop and everything it calls ([`tests/LegacyV1Mission.java`](../tests/LegacyV1Mission.java)) against the real v2 classes, from the world's start pose. Walls and wooden boxes are solid, and the cardboard boxes are left out because the model can't push them. v1 fails in two different ways:
 - **On the ideal model it never gets past the box-clearing route.** The 5th leg heads for 0°, where v1's turn check doesn't wrap around 0/360 ([bug 4](#4-turns-could-bounce-around-the-target-heading)). It accepts only 0-2°, the robot turns about 5.4° per step at full speed, and it steps back and forth over that window forever.
 - **With lag and slip its turns finish, but each one overshoots,** because the motors keep turning for the lag after v1 stops them. v1 drives every leg without steering ([bug 5](#5-straight-legs-drifted-off-line)), so the error adds up from leg to leg. It delivers two jars. On the way back for the third it is about 50 cm off its route, drives into a wooden box, and has no stall detection ([bug 3](#3-drives-had-no-timeout-or-stall-detection)), so it pushes until the run is stopped.
+
+![Animated replay of v1 and v2 running the whole mission with motor lag and wheel slip: v1 delivers two jars, then pushes against a wooden box from 412 s; v2 delivers all five in 864 s](images/mission-replay.svg)
 
 `LegacyBehaviourTest` pins both results. This is a model with no inertia, and the [demo videos](../README.md) show the robot collecting jars in Webots. Whether that was v1 or the older v0 isn't known yet; v0 turned at 1 rad/s and wouldn't overshoot like this. A Webots run of both versions (`tools/run-in-webots.sh`) is the real test.
 
@@ -208,7 +210,7 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 | Stale compiled controller | `ProjectController3.class` was committed. It was compiled from an older version of the source: it contains `findJar()`, `toStart()` and `hardcodedPath()`, which don't exist in the `.java`. Webots never compiles Java controllers by itself; it runs the `.class` it finds. So anyone who opened the repository ran that old code, not the source. | Deleted (still in git history) and `*.class` ignored. Build from source with `tools/build-controllers.sh` or Webots' Build button (the README now says so). |
 | Not a Webots project | Flat files. Webots looks for `controllers/<name>/` next to `worlds/`, and the world loads `../protos/*.proto`. | Standard `worlds/` + `controllers/` + `protos/` layout. |
 | Missing robot protos | The world needs `Pioneer3dx.proto` and `Pioneer3Gripper.proto`, which were never committed, so nobody else could open it. | Included in `protos/`, reconstructed from Webots R2021b. Every node type and field is checked statically against R2025a; not yet loaded in Webots. See [`protos/README.md`](../protos/README.md). |
-| No tests or CI | none | 117 JUnit tests (99% line coverage of v2's logic, 95% mutation score) and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and figures are up to date. |
+| No tests or CI | none | 121 JUnit tests (99% line coverage of v2's logic, 95% mutation score) and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and figures are up to date. |
 
 ---
 
@@ -223,7 +225,7 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 | Duplicate code | Camera-to-array copy twice (lines 217-228, 300-311); position read 7 times | One `captureImage()`, one `positionCm()` |
 | Dead code | `WORLD_WIDTH`/`WORLD_HEIGHT`, blue-pixel counting, `GreenDetection.greenLeft/Center/Right`, `moveHardcodedAhead`'s always-`false` return, the 400-step limit | Removed |
 | Telemetry | Progress messages without times | Every log line has the simulated time, and each run ends with a mission report: time per phase, per-jar scans and approaches, stalls, timeouts |
-| Tests | 0 | 117, covering 99% of v2's logic lines (88% including the two classes that only run inside Webots) |
+| Tests | 0 | 121, covering 99% of v2's logic lines (88% including the two classes that only run inside Webots) |
 | Mutation testing ([PIT](https://pitest.org/)) | n/a | 95% of injected bugs caught (349/369); at least 90% enforced in CI (`tools/mutation-test.sh`) |
 | Static analysis ([SpotBugs](https://spotbugs.github.io/), maximum effort, every priority) | 10 findings, all low severity: 5 unread fields, 3 `Math.floor` calls on constants, an int made via `nextDouble`, a field-naming slip | 0, enforced in CI (`tools/static-analysis.sh`) |
 

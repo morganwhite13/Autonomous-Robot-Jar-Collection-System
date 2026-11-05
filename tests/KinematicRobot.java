@@ -43,6 +43,11 @@ final class KinematicRobot implements RobotPlatform {
   double cumulativeTurnDeg;
   /** If set, the position after every step is appended (used to draw paths). */
   List<Vec2> trace;
+  /** If set, the heading after every step is appended, unwrapped (it can pass 360 or go below 0). */
+  List<Double> headingTrace;
+  /** Simulated time of each jar release, in the same order as {@link #deliveredJars}. */
+  final List<Long> deliveryTimesMs = new ArrayList<>();
+  private final double startHeadingDeg;
   /** Step count when the wheels were first commanded to move, or -1. */
   long firstMoveStep = -1;
 
@@ -67,7 +72,25 @@ final class KinematicRobot implements RobotPlatform {
     this.x = position.x;
     this.y = position.y;
     this.heading = Angles.normalize(headingDeg);
+    this.startHeadingDeg = headingDeg;
     this.timeStepMs = timeStepMs;
+  }
+
+  /** Close to the Pioneer's half-width: touching a wall or wooden box blocks the robot. */
+  static final double ROBOT_RADIUS_CM = 15;
+
+  /**
+   * The mission's starting state: the world's start pose (facing +y: the robot's rotation in the
+   * world file is the identity and the Pioneer's forward axis is -Z, which is +y here), the five
+   * jars, and walls and wooden boxes made solid.
+   */
+  static KinematicRobot atMissionStart(WorldFile world) {
+    KinematicRobot robot = new KinematicRobot(world.robotStart, 90)
+        .withStaticObstacles(world, ROBOT_RADIUS_CM);
+    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
+      robot.jars.add(jar.center);
+    }
+    return robot;
   }
 
   /** Ends the "simulation" after this many steps so a buggy loop fails the test instead of hanging. */
@@ -114,6 +137,9 @@ final class KinematicRobot implements RobotPlatform {
     cumulativeTurnDeg += Math.toDegrees(omega * dt);
     if (trace != null) {
       trace.add(Vec2.of(x, y));
+    }
+    if (headingTrace != null) {
+      headingTrace.add(startHeadingDeg + cumulativeTurnDeg);
     }
     steps++;
     elapsedMs += timeStepMs;
@@ -228,6 +254,7 @@ final class KinematicRobot implements RobotPlatform {
       // Release in front of the robot.
       double h = Math.toRadians(heading);
       deliveredJars.add(Vec2.of(x + TOUCH_DISTANCE_CM * Math.cos(h), y + TOUCH_DISTANCE_CM * Math.sin(h)));
+      deliveryTimesMs.add(elapsedMs);
       heldJar = null;
     }
   }

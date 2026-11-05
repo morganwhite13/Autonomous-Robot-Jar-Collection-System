@@ -19,20 +19,10 @@ class MissionTest {
     world = WorldFile.read(Path.of("worlds/ProjectWorld2025.wbt"));
   }
 
+  /** Walls and immovable boxes are solid, so a route through them stalls the robot. */
   private static KinematicRobot robotWithJars() {
-    // Facing +y (90 deg): the robot's rotation in the world file is the identity, and the
-    // Pioneer's forward axis is -Z, which is +y in the controllers' frame.
-    // Walls and immovable boxes are solid, so a route through them stalls the robot.
-    KinematicRobot robot = new KinematicRobot(world.robotStart, 90)
-        .withStaticObstacles(world, ROBOT_RADIUS_CM);
-    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
-      robot.jars.add(jar.center);
-    }
-    return robot;
+    return KinematicRobot.atMissionStart(world);
   }
-
-  /** Close enough to the Pioneer's half-width that touching a wall or box blocks the robot. */
-  private static final double ROBOT_RADIUS_CM = 15;
 
   @Test
   void deliversAllFiveJarsToTheirPads() {
@@ -107,7 +97,7 @@ class MissionTest {
   @Test
   void failedSearchesRetryFromTheSearchPointWithoutHittingAnything() {
     KinematicRobot robot = new KinematicRobot(world.robotStart, 90)
-        .withStaticObstacles(world, ROBOT_RADIUS_CM);
+        .withStaticObstacles(world, KinematicRobot.ROBOT_RADIUS_CM);
     robot.jars.add(world.ofKind(WorldFile.Kind.HONEY_JAR).get(1).center); // only one jar
     Mission mission = new Mission(robot);
     assertEquals(1, mission.run());

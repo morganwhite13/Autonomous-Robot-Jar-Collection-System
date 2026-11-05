@@ -44,11 +44,17 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 117 JUnit tests covering 99% of v2's logic and catching 95% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 121 JUnit tests covering 99% of v2's logic and catching 95% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
 The numbers come from running ports of v1's methods and the real v2 classes on the same kinematic model of the robot. **Neither version has been re-run in Webots since the rewrite**; see [how it was checked](docs/BEFORE_AND_AFTER.md#how-this-was-checked-and-what-still-needs-checking).
+
+### Both versions running the whole mission
+
+![Animated replay of v1 and v2 running the whole mission on the robot model: v1 delivers two jars, then drives into a wooden box on the way back for the third and pushes against it from 412 s; v2 delivers all five jars in 864 s](docs/images/mission-replay.svg)
+
+A replay at 30x speed, on the robot model with motor lag and wheel slip. v1 delivers two jars. On the way back for the third it has drifted off its route, drives into a wooden box, and pushes against it for the rest of the run. v2 delivers all five. Generated from the same runs as the benchmark by `tools/MissionReplay.java`.
 
 ---
 
@@ -208,7 +214,7 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 117 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 121 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
@@ -240,6 +246,7 @@ tools/
   webots/                      observer supervisor used by run-in-webots.sh
   BeforeAfterBenchmark.java    v1 vs v2 measurements (ideal model, then with motor lag and wheel slip)
   BeforeAfterFigure.java       draws docs/images/before-after.svg
+  MissionReplay.java           animated v1 vs v2 replay (docs/images/mission-replay.svg)
   MapRenderer.java             draws docs/images/mission-map.svg
   RoutePlanner.java            A* planner used for docs/route-planner.md (analysis only)
   WorldFile.java               reads obstacle footprints from the .wbt file

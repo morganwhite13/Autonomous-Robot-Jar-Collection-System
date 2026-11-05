@@ -74,18 +74,10 @@ class LegacyBehaviourTest {
 
   // Whole-mission behaviour (tests/LegacyV1Mission.java), as described in benchmark-results.md.
 
-  private static KinematicRobot missionRobot(WorldFile world) {
-    KinematicRobot robot = new KinematicRobot(world.robotStart, 90).withStaticObstacles(world, 15);
-    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
-      robot.jars.add(jar.center);
-    }
-    return robot;
-  }
-
   @Test
   void v1MissionNeverGetsPastTheClearingRouteOnTheIdealModel() throws Exception {
     WorldFile world = WorldFile.read(Path.of("worlds/ProjectWorld2025.wbt"));
-    KinematicRobot robot = missionRobot(world).withStepLimit(20_000);
+    KinematicRobot robot = KinematicRobot.atMissionStart(world).withStepLimit(20_000);
     LegacyV1Mission.Result result = new LegacyV1Mission(robot, 1).run();
     assertFalse(result.finished);
     assertEquals(0, result.delivered);
@@ -108,7 +100,7 @@ class LegacyBehaviourTest {
   @Test
   void v1MissionWithLagAndSlipDeliversTwoJarsThenPushesAgainstABox() throws Exception {
     WorldFile world = WorldFile.read(Path.of("worlds/ProjectWorld2025.wbt"));
-    KinematicRobot robot = missionRobot(world).withImperfections(2, 0.7).withStepLimit(30_000);
+    KinematicRobot robot = KinematicRobot.atMissionStart(world).withImperfections(2, 0.7).withStepLimit(30_000);
     LegacyV1Mission.Result result = new LegacyV1Mission(robot, 1).run();
     assertFalse(result.finished);
     assertEquals(2, result.delivered);

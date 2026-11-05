@@ -1,0 +1,336 @@
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Draws docs/images/mission-replay.svg: v1 and v2 running the whole mission side by side on the
+ * kinematic model with motor lag and wheel slip, as an animation. v1 is the line-for-line port in
+ * tests/LegacyV1Mission.java; v2 is the real controller classes.
+ *
+ * <p>The animation is plain SVG (SMIL), with no script, so it plays wherever an SVG image is shown,
+ * including a GitHub README. Viewers that don't animate show the final state.
+ *
+ * <p>Usage: {@code java MissionReplay worlds/ProjectWorld2025.wbt docs/images/mission-replay.svg}
+ */
+public class MissionReplay {
+
+  static final int LAG_STEPS = 2;
+  static final double TURN_EFFICIENCY = 0.7;
+  /** Simulated seconds per second of animation. */
+  static final double SPEEDUP = 30;
+  /** The final state stays on screen this long before the animation repeats. */
+  static final double HOLD_S = 4;
+  /** One sample every 32 steps: 1.024 s of simulated time. */
+  static final int SAMPLE_STEPS = 32;
+  static final int STEP_MS = 32;
+  static final double SWEEP_CM = 40;
+
+  // Reference palette, as in before-after.svg and the map: v1 orange, v2 blue.
+  static final String V1_COLOR = "#eb6834";
+  static final String V2_COLOR = "#2a78d6";
+  static final String INK = "#212529";
+  static final String INK2 = "#52514e";
+  static final String TRACK = "#e4e2dd";
+
+  /** A change in a run's status line, e.g. "2/5 jars", at a simulated time. */
+  static final class Status {
+    final long atMs;
+    final String text;
+
+    Status(long atMs, String text) {
+      this.atMs = atMs;
+      this.text = text;
+    }
+  }
+
+  /** One run, sampled for drawing. */
+  static final class Run {
+    final String name;
+    final String color;
+    final List<Vec2> positions = new ArrayList<>();
+    final List<Double> headings = new ArrayList<>();
+    final List<Status> statuses = new ArrayList<>();
+    /** When it got stuck and what it was doing, or -1 if it never did. */
+    long stuckSinceMs = -1;
+    String stuckText = "";
+
+    Run(String name, String color) {
+      this.name = name;
+      this.color = color;
+    }
+  }
+
+  private final MapRenderer map = new MapRenderer();
+  private int samples;
+  private double durationS;
+
+  public static void main(String[] args) throws IOException {
+    Log.useSink(line -> { });
+    WorldFile world = WorldFile.read(Path.of(args[0]));
+    Files.write(Path.of(args[1]), new MissionReplay().render(world).getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static KinematicRobot robot(WorldFile world) {
+    KinematicRobot robot = KinematicRobot.atMissionStart(world)
+        .withImperfections(LAG_STEPS, TURN_EFFICIENCY);
+    robot.trace = new ArrayList<>();
+    robot.headingTrace = new ArrayList<>();
+    return robot;
+  }
+
+  String render(WorldFile world) {
+    KinematicRobot r2 = robot(world);
+    new Mission(r2).run();
+    long steps = r2.stepsTaken();
+    Run v2 = sample("v2 (improved)", V2_COLOR, world, r2, steps);
+    v2.statuses.add(new Status(0, "0/5 jars"));
+    for (int i = 0; i < r2.deliveryTimesMs.size(); i++) {
+      boolean last = i == r2.deliveryTimesMs.size() - 1;
+      long at = r2.deliveryTimesMs.get(i);
+      v2.statuses.add(new Status(at, (i + 1) + "/5 jars" + (last && i == 4
+          ? String.format(Locale.ROOT, ", done at %.0f s", r2.elapsedMs() / 1000.0) : "")));
+    }
+
+    // v1 runs for as many steps as v2 took, so both timelines are the same length.
+    KinematicRobot r1 = robot(world).withStepLimit(steps);
+    LegacyV1Mission.Result result = new LegacyV1Mission(r1, 1).run();
+    Run v1 = sample("v1 (original)", V1_COLOR, world, r1, steps);
+    v1.statuses.add(new Status(0, "0/5 jars"));
+    for (int i = 0; i < r1.deliveryTimesMs.size(); i++) {
+      v1.statuses.add(new Status(r1.deliveryTimesMs.get(i), (i + 1) + "/5 jars"));
+    }
+    if (!result.finished) {
+      v1.stuckSinceMs = result.activitySinceMs;
+      v1.stuckText = describeStuck(world, r1, result);
+      v1.statuses.add(new Status(result.activitySinceMs,
+          result.delivered + "/5 jars, stuck from " + seconds(result.activitySinceMs)));
+    }
+
+    int holdSamples = (int) Math.round(HOLD_S * SPEEDUP * 1000 / (SAMPLE_STEPS * STEP_MS));
+    samples = v2.positions.size() + holdSamples;
+    durationS = (samples - 1) * SAMPLE_STEPS * STEP_MS / 1000.0 / SPEEDUP;
+    long endMs = steps * STEP_MS;
+
+    // Cardboard boxes on the clearing route are pushed aside in Webots; the model can't push them.
+    map.beginArena(world, "v1 vs v2 running the whole mission (replay)",
+        RoutePlanner.sweptByClearing(world, SWEEP_CM));
+    map.append(String.format(Locale.ROOT, "<desc>Animated replay at %.0fx speed of both "
+        + "controllers running the whole mission on the robot model with motor lag and wheel slip. "
+        + "%s</desc>", SPEEDUP, summary(v1, v2)));
+    trail(v1);
+    trail(v2);
+    map.endArena(world);
+    robotMarker(v1);
+    robotMarker(v2);
+    if (v1.stuckSinceMs >= 0) {
+      stuckLabel(v1);
+    }
+    legend(v1, v2, endMs);
+    return map.finish();
+  }
+
+  /** Samples the run every SAMPLE_STEPS steps, padding with the final pose if it ended early. */
+  private static Run sample(String name, String color, WorldFile world, KinematicRobot robot,
+      long steps) {
+    Run run = new Run(name, color);
+    run.positions.add(world.robotStart);
+    run.headings.add(90.0);
+    for (long s = SAMPLE_STEPS; s < steps + SAMPLE_STEPS; s += SAMPLE_STEPS) {
+      int index = (int) Math.min(Math.min(s, steps), robot.trace.size()) - 1;
+      run.positions.add(robot.trace.get(index));
+      run.headings.add(robot.headingTrace.get(index));
+    }
+    return run;
+  }
+
+  private static String describeStuck(WorldFile world, KinematicRobot robot,
+      LegacyV1Mission.Result result) {
+    if (result.activity.startsWith("turning")) {
+      return "turning back and forth";
+    }
+    for (WorldFile.Obstacle o : world.staticObstacles()) {
+      if (RoutePlanner.distanceToPolygon(robot.positionCm(), o.corners)
+          < KinematicRobot.ROBOT_RADIUS_CM + 1) {
+        return "pushing against a " + (o.kind == WorldFile.Kind.WALL ? "wall" : "wooden box");
+      }
+    }
+    return result.activity;
+  }
+
+  private static String summary(Run v1, Run v2) {
+    return v1.name + ": " + v1.statuses.get(v1.statuses.size() - 1).text + ". "
+        + v2.name + ": " + v2.statuses.get(v2.statuses.size() - 1).text + ".";
+  }
+
+  /** The path driven so far: a polyline revealed over time with an animated dash offset. */
+  private void trail(Run run) {
+    StringBuilder pts = new StringBuilder();
+    List<Double> cumulative = new ArrayList<>();
+    double length = 0;
+    double px = 0;
+    double py = 0;
+    for (int i = 0; i < run.positions.size(); i++) {
+      double x = Math.round(MapRenderer.toSvgX(run.positions.get(i).x));
+      double y = Math.round(MapRenderer.toSvgY(run.positions.get(i).y));
+      if (i > 0) {
+        length += Math.hypot(x - px, y - py);
+      }
+      cumulative.add(length);
+      pts.append(String.format(Locale.ROOT, "%.0f,%.0f ", x, y));
+      px = x;
+      py = y;
+    }
+    StringBuilder offsets = new StringBuilder();
+    for (int i = 0; i < samples; i++) {
+      double shown = cumulative.get(Math.min(i, cumulative.size() - 1));
+      offsets.append(String.format(Locale.ROOT, "%.1f;", length - shown));
+    }
+    double dash = Math.ceil(length) + 1;
+    map.append(String.format(Locale.ROOT, "<polyline points=\"%s\" fill=\"none\" stroke=\"%s\" "
+        + "stroke-width=\"7\" stroke-opacity=\"0.8\" stroke-linejoin=\"round\" "
+        + "stroke-linecap=\"round\" stroke-dasharray=\"%.0f %.0f\" stroke-dashoffset=\"0\">",
+        pts.toString().trim(), run.color, dash, dash));
+    map.append(animate("stroke-dashoffset", trimSemicolon(offsets)));
+    map.append("</polyline>");
+  }
+
+  /** A disc with a heading line, moved and turned along the samples. */
+  private void robotMarker(Run run) {
+    StringBuilder moves = new StringBuilder();
+    StringBuilder turns = new StringBuilder();
+    for (int i = 0; i < samples; i++) {
+      int k = Math.min(i, run.positions.size() - 1);
+      Vec2 p = run.positions.get(k);
+      moves.append(String.format(Locale.ROOT, "%.0f %.0f;", MapRenderer.toSvgX(p.x),
+          MapRenderer.toSvgY(p.y)));
+      // Headings increase counter-clockwise; SVG rotations are clockwise because y points down.
+      turns.append(String.format(Locale.ROOT, "%.0f;", -run.headings.get(k)));
+    }
+    Vec2 end = run.positions.get(run.positions.size() - 1);
+    double endHeading = run.headings.get(run.headings.size() - 1);
+    map.append(String.format(Locale.ROOT, "<g transform=\"translate(%.0f %.0f)\">",
+        MapRenderer.toSvgX(end.x), MapRenderer.toSvgY(end.y)));
+    map.append(String.format(Locale.ROOT, "<animateTransform attributeName=\"transform\" "
+        + "type=\"translate\" values=\"%s\" dur=\"%.3fs\" repeatCount=\"indefinite\"/>",
+        trimSemicolon(moves), durationS));
+    map.append(String.format(Locale.ROOT, "<g transform=\"rotate(%.0f)\">", -endHeading));
+    map.append(String.format(Locale.ROOT, "<animateTransform attributeName=\"transform\" "
+        + "type=\"rotate\" values=\"%s\" dur=\"%.3fs\" repeatCount=\"indefinite\"/>",
+        trimSemicolon(turns), durationS));
+    map.append("<circle r=\"26\" fill=\"" + run.color + "\" stroke=\"#ffffff\" stroke-width=\"5\"/>");
+    map.append("<line x1=\"0\" y1=\"0\" x2=\"24\" y2=\"0\" stroke=\"#ffffff\" stroke-width=\"7\" "
+        + "stroke-linecap=\"round\"/>");
+    map.append("</g>");
+    map.append("</g>");
+  }
+
+  /** Where and since when v1 has been stuck, shown from that moment on. */
+  private void stuckLabel(Run run) {
+    Vec2 p = run.positions.get(run.positions.size() - 1);
+    double x = Math.max(330, Math.min(MapRenderer.ARENA_WIDTH - 330, MapRenderer.toSvgX(p.x)));
+    double y = MapRenderer.toSvgY(p.y);
+    String showFromStuck = visibleFrom(run.stuckSinceMs);
+    map.append("<g opacity=\"1\">" + showFromStuck);
+    map.append(String.format(Locale.ROOT, "<circle cx=\"%.0f\" cy=\"%.0f\" r=\"48\" fill=\"none\" "
+        + "stroke=\"%s\" stroke-width=\"5\" stroke-dasharray=\"10 8\"/>",
+        MapRenderer.toSvgX(p.x), y, run.color));
+    String halo = "stroke=\"#fbf8f2\" stroke-width=\"9\" paint-order=\"stroke\"";
+    map.append(String.format(Locale.ROOT, "<text x=\"%.0f\" y=\"%.0f\" font-size=\"38\" "
+        + "font-weight=\"bold\" fill=\"%s\" text-anchor=\"middle\" %s>v1 stuck from %s</text>",
+        x, y - 110, run.color, halo, seconds(run.stuckSinceMs)));
+    map.append(String.format(Locale.ROOT, "<text x=\"%.0f\" y=\"%.0f\" font-size=\"34\" "
+        + "fill=\"%s\" text-anchor=\"middle\" %s>%s</text>", x, y - 66, INK, halo, run.stuckText));
+    map.append("</g>");
+  }
+
+  private void legend(Run v1, Run v2, long endMs) {
+    double top = MapRenderer.ARENA_HEIGHT;
+    statusRow(v1, top + 62);
+    statusRow(v2, top + 124);
+
+    // Simulated-time bar.
+    double barX = 1060;
+    double barW = MapRenderer.ARENA_WIDTH - barX - 40;
+    double barY = top + 58;
+    map.append(String.format(Locale.ROOT, "<text x=\"%.0f\" y=\"%.0f\" font-size=\"30\" "
+        + "fill=\"%s\">Simulated time (%.0fx speed)</text>", barX, barY - 16, INK2, SPEEDUP));
+    map.append(String.format(Locale.ROOT, "<rect x=\"%.0f\" y=\"%.0f\" width=\"%.0f\" "
+        + "height=\"22\" rx=\"4\" fill=\"%s\"/>", barX, barY, barW, TRACK));
+    double endFraction = fraction(endMs);
+    map.append(String.format(Locale.ROOT, "<rect x=\"%.0f\" y=\"%.0f\" width=\"%.0f\" "
+        + "height=\"22\" rx=\"4\" fill=\"%s\"><animate attributeName=\"width\" values=\"0;%.0f;%.0f\" "
+        + "keyTimes=\"0;%.4f;1\" dur=\"%.3fs\" repeatCount=\"indefinite\"/></rect>",
+        barX, barY, barW, INK2, barW, barW, endFraction, durationS));
+    for (long tick = 0; tick * 1000 <= endMs; tick += 200) {
+      double tx = barX + barW * tick * 1000.0 / endMs;
+      map.append(String.format(Locale.ROOT, "<text x=\"%.0f\" y=\"%.0f\" font-size=\"26\" "
+          + "fill=\"%s\" text-anchor=\"%s\">%d s</text>", tx, barY + 54, INK2,
+          tick == 0 ? "start" : "middle", tick));
+    }
+    map.append(String.format(Locale.ROOT, "<text x=\"30\" y=\"%.0f\" font-size=\"26\" fill=\"%s\">"
+        + "Robot model with motor lag and wheel slip; v1 is a line-for-line port of the original. "
+        + "Generated by tools/MissionReplay.java.</text>", top + 205, INK2));
+  }
+
+  /** "v1 (original)  2/5 jars": the status text changes at each event. */
+  private void statusRow(Run run, double y) {
+    map.append(String.format(Locale.ROOT, "<line x1=\"30\" y1=\"%.0f\" x2=\"110\" y2=\"%.0f\" "
+        + "stroke=\"%s\" stroke-width=\"10\" stroke-linecap=\"round\"/>", y - 11, y - 11, run.color));
+    map.append(String.format(Locale.ROOT, "<text x=\"130\" y=\"%.0f\" font-size=\"34\" "
+        + "font-weight=\"bold\" fill=\"%s\">%s</text>", y, INK, run.name));
+    for (int i = 0; i < run.statuses.size(); i++) {
+      Status s = run.statuses.get(i);
+      boolean last = i == run.statuses.size() - 1;
+      String timing = last ? visibleFrom(s.atMs)
+          : visibleBetween(s.atMs, run.statuses.get(i + 1).atMs);
+      map.append(String.format(Locale.ROOT, "<text x=\"390\" y=\"%.0f\" font-size=\"34\" "
+          + "fill=\"%s\" opacity=\"%s\">%s%s</text>", y, INK, last ? "1" : "0", s.text, timing));
+    }
+  }
+
+  private String visibleFrom(long ms) {
+    double f = fraction(ms);
+    if (f <= 0) {
+      return "";
+    }
+    return String.format(Locale.ROOT, "<animate attributeName=\"opacity\" values=\"0;1\" "
+        + "keyTimes=\"0;%.4f\" calcMode=\"discrete\" dur=\"%.3fs\" repeatCount=\"indefinite\"/>",
+        f, durationS);
+  }
+
+  private String visibleBetween(long fromMs, long toMs) {
+    double from = fraction(fromMs);
+    double to = fraction(toMs);
+    if (from <= 0) {
+      return String.format(Locale.ROOT, "<animate attributeName=\"opacity\" values=\"1;0\" "
+          + "keyTimes=\"0;%.4f\" calcMode=\"discrete\" dur=\"%.3fs\" repeatCount=\"indefinite\"/>",
+          to, durationS);
+    }
+    return String.format(Locale.ROOT, "<animate attributeName=\"opacity\" values=\"0;1;0\" "
+        + "keyTimes=\"0;%.4f;%.4f\" calcMode=\"discrete\" dur=\"%.3fs\" repeatCount=\"indefinite\"/>",
+        from, to, durationS);
+  }
+
+  private String animate(String attribute, String values) {
+    return String.format(Locale.ROOT, "<animate attributeName=\"%s\" values=\"%s\" dur=\"%.3fs\" "
+        + "repeatCount=\"indefinite\"/>", attribute, values, durationS);
+  }
+
+  /** Simulated time to a fraction of the animation's duration. */
+  private double fraction(long ms) {
+    return Math.max(0, Math.min(1, ms / 1000.0 / SPEEDUP / durationS));
+  }
+
+  private static String seconds(long ms) {
+    return String.format(Locale.ROOT, "%.0f s", ms / 1000.0);
+  }
+
+  private static String trimSemicolon(StringBuilder sb) {
+    return sb.length() > 0 && sb.charAt(sb.length() - 1) == ';'
+        ? sb.substring(0, sb.length() - 1) : sb.toString();
+  }
+}

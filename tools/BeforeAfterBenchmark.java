@@ -75,18 +75,12 @@ public class BeforeAfterBenchmark {
 
   static final String MISSION_ROW =
       "Whole mission (walls and wooden boxes are solid; no box physics)";
-  /** Close to the Pioneer's half-width: touching a wall or wooden box blocks the robot. */
-  static final double ROBOT_RADIUS_CM = 15;
   /** v1's whole mission is stopped after this many steps (3,200 s, about 4x v2's mission). */
   static final int V1_MISSION_STEP_LIMIT = 100_000;
 
-  /** The world's start pose (facing +y), the five jars, and solid walls and wooden boxes. */
+  /** The mission's start (see {@link KinematicRobot#atMissionStart}) with the current imperfections. */
   static KinematicRobot missionRobot(WorldFile world) {
-    KinematicRobot robot = robot(world.robotStart, 90).withStaticObstacles(world, ROBOT_RADIUS_CM);
-    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
-      robot.jars.add(jar.center);
-    }
-    return robot;
+    return KinematicRobot.atMissionStart(world).withImperfections(lagSteps, turnEfficiency);
   }
 
   /** Runs the port of v1's whole mission and describes how it went. */
@@ -98,7 +92,8 @@ public class BeforeAfterBenchmark {
     }
     String against = "";
     for (WorldFile.Obstacle o : world.staticObstacles()) {
-      if (RoutePlanner.distanceToPolygon(robot.positionCm(), o.corners) < ROBOT_RADIUS_CM + 1) {
+      if (RoutePlanner.distanceToPolygon(robot.positionCm(), o.corners)
+          < KinematicRobot.ROBOT_RADIUS_CM + 1) {
         against = ", blocked by " + o.name;
       }
     }

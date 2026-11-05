@@ -95,6 +95,7 @@ java -cp "$BUILD/test" BeforeAfterBenchmark worlds/ProjectWorld2025.wbt > docs/b
 java -cp "$BUILD/test" MapRenderer worlds/ProjectWorld2025.wbt docs/images/mission-map.svg
 java -cp "$BUILD/test" BeforeAfterFigure docs/images/before-after.svg
 java -cp "$BUILD/test" BeforeAfterFigure docs/images/before-after-dark.svg --dark
+java -cp "$BUILD/test" MissionReplay worlds/ProjectWorld2025.wbt docs/images/mission-replay.svg
 java -cp "$BUILD/test" RoutePlannerReport worlds/ProjectWorld2025.wbt docs/route-planner.md docs/images/route-planner.svg
 
 echo "==> All good"

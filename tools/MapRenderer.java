@@ -127,6 +127,45 @@ public class MapRenderer {
     return svg.toString();
   }
 
+  // ------------------------------------------------------------------ building blocks for other tools
+
+  /** Arena size in SVG units (1 unit = 1 cm), and the height of the legend area below it. */
+  static final double ARENA_WIDTH = MAX_X - MIN_X;
+  static final double ARENA_HEIGHT = MAX_Y - MIN_Y;
+  static final double LEGEND_HEIGHT = LEGEND_H;
+
+  /** Starts a drawing: header, background and obstacles (except {@code hiddenBoxes}). */
+  void beginArena(WorldFile world, String title, Collection<WorldFile.Obstacle> hiddenBoxes) {
+    hidden = hiddenBoxes;
+    open(title, new String[0][]);
+    drawObstacles(world);
+  }
+
+  /** Draws jars, the start and the search point on top, and closes the arena group. */
+  void endArena(WorldFile world) {
+    drawMarkers(world);
+    add("</g>");
+  }
+
+  /** Appends one line of SVG as is. */
+  void append(String line) {
+    svg.append(line).append('\n');
+  }
+
+  String finish() {
+    add("</svg>");
+    return svg.toString();
+  }
+
+  /** Controller frame (cm, y up) to SVG coordinates (y down). */
+  static double toSvgX(double x) {
+    return sx(x);
+  }
+
+  static double toSvgY(double y) {
+    return sy(y);
+  }
+
   /** SVG header, arrow markers, background, and the start of the clipped arena group. */
   private void open(String title, String[][] markers) {
     double w = MAX_X - MIN_X;
