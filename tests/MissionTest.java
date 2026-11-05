@@ -235,4 +235,22 @@ class MissionTest {
     assertEquals(off.stepsTaken(), on.stepsTaken());
     assertEquals(0, watched.stats().obstacleStops());
   }
+
+  @Test
+  void theLogSaysWhichOptionsAndRoutesAreOn() {
+    StringBuilder plain = new StringBuilder();
+    Log.useSink(line -> plain.append(line).append('\n'));
+    assertThrows(RobotPlatform.SimulationEnded.class,
+        () -> new Mission(robotWithJars().withStepLimit(200), Routes.HAND_TUNED).run());
+    StringBuilder all = new StringBuilder();
+    Log.useSink(line -> all.append(line).append('\n'));
+    assertThrows(RobotPlatform.SimulationEnded.class,
+        () -> new Mission(robotWithJars().withStepLimit(200), new Mission.Options()
+            .routes(Routes.PLANNED).verifyGrabs(true).sonarWatch(true)).run());
+    Log.useSink(line -> { });
+    for (String option : List.of("carry and return routes", "Grab check on", "Sonar watch on")) {
+      assertTrue(all.indexOf(option) >= 0, option + " missing from:\n" + all);
+      assertTrue(plain.indexOf(option) < 0, option + " logged when off:\n" + plain);
+    }
+  }
 }
