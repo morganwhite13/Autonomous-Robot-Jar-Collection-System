@@ -1,4 +1,7 @@
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -99,5 +102,109 @@ class NavigatorTest {
       assertTrue(robot.positionCm().distanceTo(waypoint) < 3,
           "missed " + waypoint + ", at " + robot.positionCm());
     }
+  }
+
+  @Test
+  void everyMotionRoutineLeavesTheWheelsStopped() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    Navigator nav = nav(robot);
+    nav.turnTo(120, Config.MAX_SPEED);
+    assertTrue(robot.isStopped(), "after turnTo");
+    nav.driveTo(Vec2.of(-100, 150));
+    assertTrue(robot.isStopped(), "after driveTo");
+    nav.driveSteps(Config.MANOEUVRE_SPEED, 30);
+    assertTrue(robot.isStopped(), "after driveSteps");
+    KinematicRobot blocked = new KinematicRobot(Vec2.of(0, 0), 0);
+    blocked.blocked = p -> p.x > 50;
+    nav(blocked).driveTo(Vec2.of(300, 0));
+    assertTrue(blocked.isStopped(), "after a stall");
+  }
+
+  @Test
+  void driveStepsMovesForwardForExactlyThatManySteps() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    nav(robot).driveSteps(Config.MANOEUVRE_SPEED, 60);
+    assertEquals(60, robot.stepsTaken());
+    double expected = 60 * 0.032 * Config.MANOEUVRE_SPEED * KinematicRobot.WHEEL_RADIUS_CM;
+    assertEquals(expected, robot.positionCm().x, 1e-6);
+  }
+
+  @Test
+  void followRouteReportsWhetherEveryLegArrived() {
+    KinematicRobot open = new KinematicRobot(Vec2.of(0, 0), 0);
+    assertTrue(nav(open).followRoute(List.of(Vec2.of(100, 0), Vec2.of(100, 100))));
+    KinematicRobot walled = new KinematicRobot(Vec2.of(0, 0), 0);
+    walled.blocked = p -> p.x > 50;
+    assertFalse(nav(walled).followRoute(List.of(Vec2.of(100, 0), Vec2.of(0, 0))));
+  }
+
+  @Test
+  void goingToWhereTheRobotAlreadyIsDoesNothing() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(10, 10), 45);
+    assertEquals(Navigator.DriveResult.ARRIVED, nav(robot).goTo(Vec2.of(10.5, 10)));
+    assertEquals(0, robot.stepsTaken());
+  }
+
+  @Test
+  void headingToleranceIsInclusive() {
+    KinematicRobot within = new KinematicRobot(Vec2.of(0, 0), 90);
+    nav(within).turnTo(90 + Config.HEADING_TOLERANCE_DEG, Config.MAX_SPEED);
+    assertEquals(0, within.stepsTaken());
+    KinematicRobot outside = new KinematicRobot(Vec2.of(0, 0), 90);
+    nav(outside).turnTo(90 + Config.HEADING_TOLERANCE_DEG + 0.5, Config.MAX_SPEED);
+    assertTrue(outside.stepsTaken() > 0);
+  }
+
+  @Test
+  void driveThatKeepsMovingButNeverArrivesTimesOut() {
+    ScriptedRobot circling = new ScriptedRobot();
+    circling.orbitRadiusCm = 50;
+    circling.orbitDegPerStep = 2;
+    MissionStats stats = new MissionStats(circling::elapsedMs);
+    assertEquals(Navigator.DriveResult.TIMED_OUT,
+        new Navigator(circling, stats).driveTo(Vec2.of(300, 0)));
+    assertEquals(1, stats.driveTimeouts);
+    assertEquals(Math.max(Config.DRIVE_TIMEOUT_MIN_STEPS, (int) (300 * Config.DRIVE_TIMEOUT_STEPS_PER_CM)),
+        circling.steps);
+    assertTrue(circling.isStopped());
+  }
+
+  @Test
+  void turnSlowsDownNearTheTarget() {
+    KinematicRobot far = new KinematicRobot(Vec2.of(0, 0), 0).withStepLimit(0);
+    assertThrows(RobotPlatform.SimulationEnded.class, () -> nav(far).turnTo(90, Config.MAX_SPEED));
+    assertArrayEquals(new double[] {-Config.MAX_SPEED, Config.MAX_SPEED}, far.lastCommand(), 1e-9);
+    KinematicRobot near = new KinematicRobot(Vec2.of(0, 0), 0).withStepLimit(0);
+    assertThrows(RobotPlatform.SimulationEnded.class, () -> nav(near).turnTo(-10, Config.MAX_SPEED));
+    double speed = Config.MAX_SPEED * 10 / Config.TURN_SLOWDOWN_DEG;
+    assertArrayEquals(new double[] {speed, -speed}, near.lastCommand(), 1e-9);
+    KinematicRobot nearest = new KinematicRobot(Vec2.of(0, 0), 0).withStepLimit(0);
+    assertThrows(RobotPlatform.SimulationEnded.class, () -> nav(nearest).turnTo(3.5, Config.MAX_SPEED));
+    assertArrayEquals(new double[] {-Config.TURN_MIN_SPEED, Config.TURN_MIN_SPEED},
+        nearest.lastCommand(), 1e-9);
+  }
+
+  @Test
+  void headingHoldCorrectionIsProportionalToTheError() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), -2).withStepLimit(0);
+    assertThrows(RobotPlatform.SimulationEnded.class, () -> nav(robot).driveTo(Vec2.of(500, 0)));
+    double correction = 2 * Config.HEADING_HOLD_GAIN; // target is 2 degrees to the left
+    assertArrayEquals(new double[] {Config.MAX_SPEED - correction, Config.MAX_SPEED},
+        robot.lastCommand(), 1e-9);
+  }
+
+  @Test
+  void stallIsCheckedEveryFortySteps() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    robot.blocked = p -> p.x > 100; // reached after about 64 steps
+    nav(robot).driveTo(Vec2.of(300, 0));
+    assertEquals(3 * Config.STALL_WINDOW_STEPS, robot.stepsTaken());
+  }
+
+  @Test
+  void turnThatCannotFinishStopsTheWheels() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0).withImperfections(0, 0.0);
+    nav(robot).turnTo(90, Config.MAX_SPEED);
+    assertTrue(robot.isStopped());
   }
 }

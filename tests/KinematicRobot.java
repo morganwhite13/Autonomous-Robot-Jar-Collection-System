@@ -43,6 +43,8 @@ final class KinematicRobot implements RobotPlatform {
   double cumulativeTurnDeg;
   /** If set, the position after every step is appended (used to draw paths). */
   List<Vec2> trace;
+  /** Step count when the wheels were first commanded to move, or -1. */
+  long firstMoveStep = -1;
 
   final List<Vec2> jars = new ArrayList<>();
   final List<Vec2> deliveredJars = new ArrayList<>();
@@ -126,6 +128,36 @@ final class KinematicRobot implements RobotPlatform {
   public void drive(double left, double right) {
     commandedLeft = left;
     commandedRight = right;
+    if (firstMoveStep < 0 && (left != 0 || right != 0)) {
+      firstMoveStep = steps;
+    }
+  }
+
+  /** The last wheel command: {left, right} in rad/s. */
+  double[] lastCommand() {
+    return new double[] {commandedLeft, commandedRight};
+  }
+
+  /** True if the last wheel command was "stop". */
+  boolean isStopped() {
+    return commandedLeft == 0 && commandedRight == 0;
+  }
+
+  /** Makes walls and immovable boxes solid: the robot centre can't come within radiusCm. */
+  KinematicRobot withStaticObstacles(WorldFile world, double radiusCm) {
+    List<Vec2[]> solid = new ArrayList<>();
+    for (WorldFile.Obstacle o : world.staticObstacles()) {
+      solid.add(o.corners);
+    }
+    blocked = p -> {
+      for (Vec2[] polygon : solid) {
+        if (RoutePlanner.distanceToPolygon(p, polygon) < radiusCm) {
+          return true;
+        }
+      }
+      return false;
+    };
+    return this;
   }
 
   @Override

@@ -22,12 +22,17 @@ class MissionTest {
   private static KinematicRobot robotWithJars() {
     // Facing +y (90 deg): the robot's rotation in the world file is the identity, and the
     // Pioneer's forward axis is -Z, which is +y in the controllers' frame.
-    KinematicRobot robot = new KinematicRobot(world.robotStart, 90);
+    // Walls and immovable boxes are solid, so a route through them stalls the robot.
+    KinematicRobot robot = new KinematicRobot(world.robotStart, 90)
+        .withStaticObstacles(world, ROBOT_RADIUS_CM);
     for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
       robot.jars.add(jar.center);
     }
     return robot;
   }
+
+  /** Close enough to the Pioneer's half-width that touching a wall or box blocks the robot. */
+  private static final double ROBOT_RADIUS_CM = 15;
 
   @Test
   void deliversAllFiveJarsToTheirPads() {
@@ -86,5 +91,66 @@ class MissionTest {
     KinematicRobot robot = robotWithJars().withStepLimit(3_000);
     assertThrows(RobotPlatform.SimulationEnded.class, () -> new Mission(robot).run());
     assertEquals(3_000, robot.stepsTaken());
+  }
+
+  /**
+   * Regression test for v2's most important fix: after a failed search the robot must go back to
+   * the search point the short way. Taking the drop-off route instead (v1's behaviour) drives
+   * straight through immovable boxes, which stalls this model.
+   */
+  @Test
+  void failedSearchesRetryFromTheSearchPointWithoutHittingAnything() {
+    KinematicRobot robot = new KinematicRobot(world.robotStart, 90)
+        .withStaticObstacles(world, ROBOT_RADIUS_CM);
+    robot.jars.add(world.ofKind(WorldFile.Kind.HONEY_JAR).get(1).center); // only one jar
+    Mission mission = new Mission(robot);
+    assertEquals(1, mission.run());
+    assertEquals(Config.MAX_CONSECUTIVE_FAILED_SEARCHES, mission.stats().failedSearches);
+    assertEquals(0, mission.stats().driveStalls + mission.stats().driveTimeouts);
+  }
+
+  @Test
+  void startUpOpensTheGripperAndWaitsLikeV1BeforeMoving() {
+    KinematicRobot robot = robotWithJars().withStepLimit(100);
+    robot.fingers = Config.FINGERS_CLOSED; // start-up must open and lower the gripper
+    robot.lift = Config.LIFT_UP;
+    assertThrows(RobotPlatform.SimulationEnded.class, () -> new Mission(robot).run());
+    // v1: delay(1000) = 32 steps of 32 ms, then a 10-step sensor test.
+    assertEquals(32 + Config.SENSOR_SELF_TEST_STEPS, robot.firstMoveStep);
+    assertEquals(Config.FINGERS_OPEN, robot.fingers);
+    assertEquals(Config.LIFT_DOWN, robot.lift);
+  }
+
+  @Test
+  void reportCoversEveryPhaseAndJar() {
+    Mission mission = new Mission(robotWithJars());
+    mission.run();
+    MissionStats stats = mission.stats();
+    assertEquals(List.of(Mission.PHASE_STARTUP, Mission.PHASE_CLEARING, Mission.PHASE_TO_SEARCH,
+        Mission.PHASE_SEARCH, Mission.PHASE_TO_DROPOFF, Mission.PHASE_PLACE),
+        new ArrayList<>(stats.phases().keySet()));
+    for (long ms : stats.phases().values()) {
+      assertTrue(ms > 0);
+    }
+    assertEquals(5, stats.jars().size());
+    for (int i = 0; i < 5; i++) {
+      assertEquals(i + 1, stats.jars().get(i).number);
+    }
+    for (MissionStats.JarRecord jar : stats.jars()) {
+      assertTrue(jar.delivered && jar.scans >= 1 && jar.approaches >= 1 && jar.endMs > jar.startMs);
+    }
+    assertTrue(stats.report().contains("5/5 jars delivered"));
+  }
+
+  @Test
+  void phaseTimesAddUpToTheWholeMission() {
+    KinematicRobot robot = robotWithJars();
+    Mission mission = new Mission(robot);
+    mission.run();
+    long total = 0;
+    for (long ms : mission.stats().phases().values()) {
+      total += ms;
+    }
+    assertEquals(robot.elapsedMs(), total);
   }
 }

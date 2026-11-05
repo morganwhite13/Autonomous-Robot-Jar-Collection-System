@@ -94,4 +94,61 @@ class VisionTest {
     assertEquals(30 + Config.SCAN_CENTER_BONUS, Vision.scanScore(new Vision.SectorCounts(5, 20, 5)));
     assertEquals(30, Vision.scanScore(new Vision.SectorCounts(20, 5, 5)));
   }
+
+  // Exact boundaries of v1's rules (mutation testing showed these were not pinned down).
+
+  @Test
+  void steeringMarginIsStrictlyMoreThanTenPixels() {
+    assertEquals(Vision.Steering.STRAIGHT, Vision.steer(new Vision.SectorCounts(20, 10, 10)));
+    assertEquals(Vision.Steering.LEFT, Vision.steer(new Vision.SectorCounts(21, 10, 10)));
+    assertEquals(Vision.Steering.STRAIGHT, Vision.steer(new Vision.SectorCounts(10, 10, 20)));
+    assertEquals(Vision.Steering.RIGHT, Vision.steer(new Vision.SectorCounts(10, 10, 21)));
+    assertEquals(Vision.Steering.UNCLEAR, Vision.steer(new Vision.SectorCounts(10, 20, 0)));
+    assertEquals(Vision.Steering.STRAIGHT, Vision.steer(new Vision.SectorCounts(0, 21, 10)));
+  }
+
+  @Test
+  void straightAheadNeedsMoreThanThirtyPixelsWhenNoThirdLeads() {
+    assertEquals(Vision.Steering.UNCLEAR, Vision.steer(new Vision.SectorCounts(10, 10, 10)));
+    assertEquals(Vision.Steering.STRAIGHT, Vision.steer(new Vision.SectorCounts(11, 10, 10)));
+  }
+
+  @Test
+  void greenThresholdsAndMarginAreExact() {
+    assertFalse(Vision.isJarGreen(100, 110, 50)); // green beats red by exactly 10
+    assertTrue(Vision.isJarGreen(100, 111, 50));
+    assertFalse(Vision.isJarGreen(50, 110, 100)); // green beats blue by exactly 10
+    assertTrue(Vision.isJarGreen(50, 111, 100));
+    assertTrue(Vision.isJarGreen(119, 200, 0));
+    assertFalse(Vision.isJarGreen(120, 200, 0));
+    assertTrue(Vision.isJarGreen(0, 36, 0));
+    assertFalse(Vision.isJarGreen(0, 35, 0));
+    assertFalse(Vision.isJarGreen(0, 200, 120));
+  }
+
+  @Test
+  void dominantSectorNeedsToBeatBothOthers() {
+    assertEquals(Vision.Sector.LEFT, new Vision.SectorCounts(20, 10, 10).dominant());
+    assertEquals(Vision.Sector.RIGHT, new Vision.SectorCounts(10, 10, 20).dominant());
+    assertEquals(Vision.Sector.CENTER, new Vision.SectorCounts(10, 10, 5).dominant());
+    assertEquals(Vision.Sector.CENTER, new Vision.SectorCounts(5, 10, 10).dominant());
+    assertEquals(Vision.Sector.CENTER, new Vision.SectorCounts(10, 5, 10).dominant());
+    assertEquals("[L:1 C:2 R:3]", new Vision.SectorCounts(1, 2, 3).toString());
+  }
+
+  @Test
+  void eachHalfOfEverySteeringRuleHasItsOwnBoundary() {
+    // left must beat centre AND right by more than 10; check each comparison on its own
+    assertEquals(Vision.Steering.UNCLEAR, Vision.steer(new Vision.SectorCounts(20, 10, 0)));
+    assertEquals(Vision.Steering.UNCLEAR, Vision.steer(new Vision.SectorCounts(20, 0, 10)));
+    assertEquals(Vision.Steering.LEFT, Vision.steer(new Vision.SectorCounts(21, 10, 0)));
+    assertEquals(Vision.Steering.LEFT, Vision.steer(new Vision.SectorCounts(21, 0, 10)));
+    assertEquals(Vision.Steering.UNCLEAR, Vision.steer(new Vision.SectorCounts(10, 0, 20)));
+    assertEquals(Vision.Steering.UNCLEAR, Vision.steer(new Vision.SectorCounts(0, 10, 20)));
+    assertEquals(Vision.Steering.RIGHT, Vision.steer(new Vision.SectorCounts(10, 0, 21)));
+    assertEquals(Vision.Steering.RIGHT, Vision.steer(new Vision.SectorCounts(0, 10, 21)));
+    assertEquals(Vision.Steering.UNCLEAR, Vision.steer(new Vision.SectorCounts(0, 20, 10)));
+    assertEquals(Vision.Steering.STRAIGHT, Vision.steer(new Vision.SectorCounts(0, 21, 10)));
+    assertEquals(Vision.Steering.STRAIGHT, Vision.steer(new Vision.SectorCounts(10, 21, 0)));
+  }
 }

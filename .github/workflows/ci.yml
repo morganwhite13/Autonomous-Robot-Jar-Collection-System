@@ -20,11 +20,11 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
 
-      - name: Cache tool downloads (JUnit, SpotBugs)
+      - name: Cache tool downloads (JUnit, SpotBugs, PIT)
         uses: actions/cache@v4
         with:
           path: build/lib
-          key: build-lib-jdk${{ matrix.java }}-junit-1.10.2-spotbugs-4.8.6
+          key: build-lib-jdk${{ matrix.java }}-junit-1.10.2-spotbugs-4.8.6-pit-1.15.8
 
       - name: Compile both controllers, run tests, regenerate docs
         run: tools/run-tests.sh
@@ -43,3 +43,7 @@ jobs:
       - name: Static analysis (SpotBugs; v2 must have no findings)
         if: matrix.java == '21'
         run: tools/static-analysis.sh
+
+      - name: Mutation testing (PIT; at least 90% of changes must be caught)
+        if: matrix.java == '21'
+        run: tools/mutation-test.sh
