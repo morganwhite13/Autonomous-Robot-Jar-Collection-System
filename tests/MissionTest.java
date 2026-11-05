@@ -50,6 +50,16 @@ class MissionTest {
   }
 
   @Test
+  void optInPlannedRoutesAlsoDeliverAllJarsAndFinishSooner() {
+    KinematicRobot handTuned = robotWithJars();
+    assertEquals(5, new Mission(handTuned, Routes.HAND_TUNED).run());
+    KinematicRobot planned = robotWithJars();
+    assertEquals(5, new Mission(planned, Routes.PLANNED).run());
+    assertTrue(planned.elapsedMs() < handTuned.elapsedMs(),
+        planned.elapsedMs() + " ms vs " + handTuned.elapsedMs() + " ms");
+  }
+
+  @Test
   void identicalRunsGiveIdenticalReports() {
     List<String> logs = new ArrayList<>();
     for (int run = 0; run < 2; run++) {

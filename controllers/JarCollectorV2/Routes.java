@@ -72,6 +72,56 @@ final class Routes {
       Vec2.of(850, 100),
       SEARCH_POINT);
 
+  /**
+   * Opt-in alternative to the carry and return routes ({@link Config#USE_PLANNED_ROUTES}):
+   * shortest routes found by the A* planner in tools/RoutePlanner.java, keeping the same 35 cm
+   * clearance, assuming the boxes the clearing route sweeps past end up out of the way. The
+   * carry route still leaves the jar bay through (850, 100). About 13-14% shorter than the
+   * hand-tuned routes; untested in Webots. RoutePlannerTest checks these still match the planner.
+   */
+  static final List<Vec2> PLANNED_SEARCH_TO_DROPOFF = List.of(
+      Vec2.of(850, 100),
+      Vec2.of(393, 153),
+      Vec2.of(-197, 313),
+      Vec2.of(-387, 543),
+      Vec2.of(-422, 548),
+      Vec2.of(-497, 548),
+      Vec2.of(-647, 403),
+      Vec2.of(-732, 403),
+      Vec2.of(-757, 423),
+      DROPOFF_ENTRY);
+
+  static final List<Vec2> PLANNED_DROPOFF_TO_SEARCH = List.of(
+      DROPOFF_ENTRY,
+      Vec2.of(-752, 418),
+      Vec2.of(-727, 403),
+      Vec2.of(-632, 403),
+      Vec2.of(-487, 543),
+      Vec2.of(-462, 548),
+      Vec2.of(-392, 548),
+      Vec2.of(-197, 313),
+      Vec2.of(408, 153),
+      Vec2.of(783, 108),
+      SEARCH_POINT);
+
+  /** The pair of routes a mission uses to carry jars and come back for the next one. */
+  static final class RouteSet {
+    final String name;
+    final List<Vec2> searchToDropoff;
+    final List<Vec2> dropoffToSearch;
+
+    RouteSet(String name, List<Vec2> searchToDropoff, List<Vec2> dropoffToSearch) {
+      this.name = name;
+      this.searchToDropoff = searchToDropoff;
+      this.dropoffToSearch = dropoffToSearch;
+    }
+  }
+
+  static final RouteSet HAND_TUNED =
+      new RouteSet("hand-tuned", SEARCH_TO_DROPOFF, DROPOFF_TO_SEARCH);
+  static final RouteSet PLANNED =
+      new RouteSet("planned (A*)", PLANNED_SEARCH_TO_DROPOFF, PLANNED_DROPOFF_TO_SEARCH);
+
   /** Lane spacing between drop-off slots, cm (v1). */
   static final int SLOT_SPACING_CM = 30;
 

@@ -80,7 +80,17 @@ public class RoutePlannerReport {
         .append("counted, but both kinds of route have a similar number of legs. The saving ")
         .append("also assumes the swept boxes really end up clear of the planned line, which ")
         .append("only a Webots run can confirm. So this is a candidate for a future version, ")
-        .append("not a change to v2.\n\n");
+        .append("not a change to v2's default.\n\n");
+    md.append("## Trying it\n\n");
+    md.append("v2 includes these routes as an option, off by default: `Config.USE_PLANNED_ROUTES` ")
+        .append("(`Routes.PLANNED`). The stored carry route leaves the jar bay through (850, 100) ")
+        .append("like the hand-tuned one; the stored routes are ")
+        .append(String.format(Locale.ROOT, "%.1f m (carry) and %.1f m (return)",
+            Routes.length(search, Routes.PLANNED_SEARCH_TO_DROPOFF) / 100,
+            Routes.length(dropoff, Routes.PLANNED_DROPOFF_TO_SEARCH.subList(1,
+                Routes.PLANNED_DROPOFF_TO_SEARCH.size())) / 100))
+        .append(" long. To compare it with the default in Webots, run ")
+        .append("`tools/run-in-webots.sh v2 v2-planned`.\n\n");
     md.append("![Map comparing the hand-tuned carry route with the shorter A* route after clearing]")
         .append("(images/route-planner.svg)\n");
     Files.write(Path.of(args[1]), md.toString().getBytes(StandardCharsets.UTF_8));
@@ -91,6 +101,35 @@ public class RoutePlannerReport {
     String svg = new MapRenderer().renderPaths(world, paths, swept,
         "Hand-tuned vs planned carry route", "Cardboard box the clearing route doesn't reach");
     Files.write(Path.of(args[2]), svg.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /** Bay exit used by both carry routes, so the robot leaves the jar bay the same way. */
+  static final Vec2 BAY_EXIT = Vec2.of(850, 100);
+
+  /** The planned carry route, as stored in Routes.PLANNED_SEARCH_TO_DROPOFF (rounded to cm). */
+  static List<Vec2> plannedCarry(WorldFile world) {
+    List<Vec2> route = new ArrayList<>();
+    route.add(BAY_EXIT);
+    route.addAll(RoutePlanner.afterClearing(world, CLEARANCE_CM, SWEEP_CM)
+        .plan(BAY_EXIT, Routes.DROPOFF_ENTRY));
+    return rounded(route);
+  }
+
+  /** The planned return route, as stored in Routes.PLANNED_DROPOFF_TO_SEARCH (rounded to cm). */
+  static List<Vec2> plannedReturn(WorldFile world) {
+    List<Vec2> route = new ArrayList<>();
+    route.add(Routes.DROPOFF_ENTRY);
+    route.addAll(RoutePlanner.afterClearing(world, CLEARANCE_CM, SWEEP_CM)
+        .plan(Routes.DROPOFF_ENTRY, Routes.SEARCH_POINT));
+    return rounded(route);
+  }
+
+  private static List<Vec2> rounded(List<Vec2> route) {
+    List<Vec2> out = new ArrayList<>();
+    for (Vec2 p : route) {
+      out.add(Vec2.of(Math.round(p.x), Math.round(p.y)));
+    }
+    return out;
   }
 
   private static String row(String name, int handLegs, double handCm, List<Vec2> planned,

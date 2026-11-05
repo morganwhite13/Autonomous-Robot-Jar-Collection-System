@@ -18,6 +18,12 @@ final class Config {
   static final int MAX_CONSECUTIVE_FAILED_SEARCHES = 3;
   /** new: seed for the random wander so runs are repeatable (v1 used unseeded Math.random()). */
   static final long RANDOM_SEED = 2025L;
+  /**
+   * new, off by default: carry and return along the shorter A*-planned routes
+   * ({@link Routes#PLANNED}) instead of v1's hand-tuned ones. Untested in Webots; try it with
+   * tools/run-in-webots.sh v2-planned.
+   */
+  static final boolean USE_PLANNED_ROUTES = false;
   /** v1 printed front-sonar readings 10 times at start-up; v2 prints one line. */
   static final boolean PRINT_SENSOR_SELF_TEST = true;
   static final int SENSOR_SELF_TEST_STEPS = 10;

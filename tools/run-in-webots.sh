@@ -3,6 +3,8 @@
 #
 #   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh            # both versions
 #   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh v2         # just one
+#   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh v1 v2 v2-planned
+#                       # v2-planned: v2 with Config.USE_PLANNED_ROUTES switched on (A* routes)
 #   tools/run-in-webots.sh --dry-run                                # build everything, don't launch
 #   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh --watch v2 # watch it in real time
 #
@@ -31,7 +33,7 @@ while [ $# -gt 0 ]; do
     --limit) LIMIT="$2"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --watch) WATCH=1; shift ;;
-    v1|v2) VERSIONS+=("$1"); shift ;;
+    v1|v2|v2-planned) VERSIONS+=("$1"); shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -81,7 +83,7 @@ mkdir -p "$RUN_ROOT"
 for version in "${VERSIONS[@]}"; do
   case "$version" in
     v1) controller=ProjectController3; world=ProjectWorld2025.wbt ;;
-    v2) controller=JarCollectorV2; world=ProjectWorld2025_v2.wbt ;;
+    v2|v2-planned) controller=JarCollectorV2; world=ProjectWorld2025_v2.wbt ;;
   esac
   dir="$RUN_ROOT/$version"
   echo "==> Preparing $version in $dir"
@@ -89,6 +91,12 @@ for version in "${VERSIONS[@]}"; do
   mkdir -p "$dir/worlds" "$dir/controllers/Observer" "$dir/protos"
   cp protos/*.proto "$dir/protos/"
   cp -R "controllers/$controller" "$dir/controllers/"
+  if [ "$version" = v2-planned ]; then
+    config="$dir/controllers/$controller/Config.java"
+    sed 's/USE_PLANNED_ROUTES = false;/USE_PLANNED_ROUTES = true;/' "$config" > "$config.tmp"
+    mv "$config.tmp" "$config"
+    grep -q 'USE_PLANNED_ROUTES = true;' "$config" || { echo "could not switch on planned routes" >&2; exit 1; }
+  fi
   cp tools/webots/Observer.java tools/webots/DeliveryTracker.java "$dir/controllers/Observer/"
   out_abs="$(cd "$dir" && pwd)"
 
@@ -144,7 +152,12 @@ if [ ${#paths[@]} -gt 0 ]; then
 fi
 cat "$RUN_ROOT/report.md"
 
-if [ "${VERSIONS[*]}" = "v1 v2" ] && [ -f "$RUN_ROOT/paths.svg" ]; then
+ran() { # version
+  local v
+  for v in "${VERSIONS[@]}"; do [ "$v" = "$1" ] && return 0; done
+  return 1
+}
+if ran v1 && ran v2 && [ -f "$RUN_ROOT/paths.svg" ]; then
   {
     echo "# Webots results"
     echo
@@ -154,7 +167,7 @@ if [ "${VERSIONS[*]}" = "v1 v2" ] && [ -f "$RUN_ROOT/paths.svg" ]; then
     echo
     cat "$RUN_ROOT/report.md"
     echo
-    echo "![Paths driven in Webots: v1 orange, v2 blue](images/webots-paths.svg)"
+    echo "![Paths driven in Webots: v1 orange, v2 blue, v2-planned (if run) green](images/webots-paths.svg)"
   } > docs/webots-results.md
   cp "$RUN_ROOT/paths.svg" docs/images/webots-paths.svg
   echo "==> Updated docs/webots-results.md and docs/images/webots-paths.svg"

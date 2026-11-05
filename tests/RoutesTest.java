@@ -64,6 +64,8 @@ class RoutesTest {
     assertRouteClearance(Routes.SEARCH_POINT, Routes.TO_SEARCH_POINT, 30);
     assertRouteClearance(Routes.SEARCH_POINT, Routes.SEARCH_TO_DROPOFF, 30);
     assertRouteClearance(Routes.DROPOFF_ENTRY, Routes.DROPOFF_TO_SEARCH, 30);
+    assertRouteClearance(Routes.SEARCH_POINT, Routes.PLANNED_SEARCH_TO_DROPOFF, 30);
+    assertRouteClearance(Routes.DROPOFF_ENTRY, Routes.PLANNED_DROPOFF_TO_SEARCH, 30);
     for (int jarIndex = 0; jarIndex < Config.JAR_COUNT; jarIndex++) {
       // Placement deliberately drives up to the pads.
       assertRouteClearance(Routes.DROPOFF_ENTRY, Routes.placementPath(jarIndex), 15);

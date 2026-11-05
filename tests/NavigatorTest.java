@@ -86,6 +86,8 @@ class NavigatorTest {
     checkRoute(Routes.SEARCH_POINT, 270, Routes.TO_SEARCH_POINT);
     checkRoute(Routes.SEARCH_POINT, 120, Routes.SEARCH_TO_DROPOFF);
     checkRoute(Vec2.of(-900, 637), 0, Routes.DROPOFF_TO_SEARCH);
+    checkRoute(Routes.SEARCH_POINT, 120, Routes.PLANNED_SEARCH_TO_DROPOFF);
+    checkRoute(Vec2.of(-900, 637), 0, Routes.PLANNED_DROPOFF_TO_SEARCH);
     checkRoute(Routes.DROPOFF_ENTRY, 90, Routes.placementPath(4));
   }
 

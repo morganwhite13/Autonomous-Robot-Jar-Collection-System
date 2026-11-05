@@ -186,20 +186,35 @@ final class RoutePlanner {
     return smooth(raw);
   }
 
-  /** String pulling: from each waypoint, jump to the furthest point still in line of sight. */
+  /**
+   * String pulling: from each waypoint, jump to the furthest point still in line of sight. Then
+   * drop any waypoint closer than {@link #MIN_LEG_CM} to the next one when the robot can go
+   * straight past it, since each extra waypoint costs a turn on the spot.
+   */
   private List<Vec2> smooth(List<Vec2> raw) {
-    List<Vec2> out = new ArrayList<>();
+    List<Vec2> pulled = new ArrayList<>();
+    pulled.add(raw.get(0));
     int i = 0;
     while (i < raw.size() - 1) {
       int j = raw.size() - 1;
       while (j > i + 1 && !lineOfSight(raw.get(i), raw.get(j))) {
         j--;
       }
-      out.add(raw.get(j));
+      pulled.add(raw.get(j));
       i = j;
     }
-    return out;
+    for (int k = pulled.size() - 2; k >= 1; k--) {
+      Vec2 here = pulled.get(k);
+      if (here.distanceTo(pulled.get(k + 1)) < MIN_LEG_CM
+          && lineOfSight(pulled.get(k - 1), pulled.get(k + 1))) {
+        pulled.remove(k);
+      }
+    }
+    return pulled.subList(1, pulled.size());
   }
+
+  /** Legs shorter than this are merged into their neighbours where line of sight allows. */
+  static final double MIN_LEG_CM = 20;
 
   /** True if every point along the segment (sampled every half cell) is in a free cell. */
   boolean lineOfSight(Vec2 a, Vec2 b) {

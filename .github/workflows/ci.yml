@@ -34,7 +34,7 @@ jobs:
         run: git diff --exit-code -- docs/benchmark-results.md docs/images/mission-map.svg docs/images/before-after.svg docs/images/before-after-dark.svg docs/route-planner.md docs/images/route-planner.svg
 
       - name: Webots comparison builds (dry run, no Webots needed)
-        run: tools/run-in-webots.sh --dry-run
+        run: tools/run-in-webots.sh --dry-run v1 v2 v2-planned
 
       - name: Lint shell scripts
         if: matrix.java == '21'

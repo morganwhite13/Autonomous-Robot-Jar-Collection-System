@@ -43,7 +43,7 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 66 JUnit tests covering 96% of v2's logic; SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 68 JUnit tests covering 96% of v2's logic; SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -201,19 +201,19 @@ The robot protos the world needs are included in `protos/`. They are reconstruct
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh      # macOS: WEBOTS_HOME=/Applications/Webots.app
 ```
-This runs both worlds without a window (using `xvfb-run` on Linux) and judges them the same way. An invisible observer supervisor, added only to temporary copies of the worlds, records the robot's path and the moment each jar comes to rest at the drop-off. It ends each run when all five are delivered, or after an hour of simulated time. The script then writes `docs/webots-results.md` (jars delivered, mission time, distance driven, aborted approaches, failed searches, stalls) and `docs/images/webots-paths.svg` (both driven paths on the arena map). Add `--dry-run` to build and compile everything without launching Webots. Add `--watch v2` to open the Webots window and run at real-time speed instead, for example to record a new demo video.
+This runs both worlds without a window (using `xvfb-run` on Linux) and judges them the same way. An invisible observer supervisor, added only to temporary copies of the worlds, records the robot's path and the moment each jar comes to rest at the drop-off. It ends each run when all five are delivered, or after an hour of simulated time. The script then writes `docs/webots-results.md` (jars delivered, mission time, distance driven, aborted approaches, failed searches, stalls) and `docs/images/webots-paths.svg` (both driven paths on the arena map). Add `v2-planned` to also run v2 on the shorter A*-planned routes (see the [route planner analysis](docs/route-planner.md)): `tools/run-in-webots.sh v1 v2 v2-planned`. Add `--dry-run` to build and compile everything without launching Webots. Add `--watch v2` to open the Webots window and run at real-time speed instead, for example to record a new demo video.
 
 ### Tests (no Webots needed)
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 66 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 68 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
 ```
 
-Add `--coverage` to measure line coverage of the v2 controller with JaCoCo. It's currently 96% of the logic, and 83% overall, since `WebotsPlatform` and the entry point only run inside Webots. The HTML report lands in `build/coverage/index.html`.
+Add `--coverage` to measure line coverage of the v2 controller with JaCoCo. It's currently 96% of the logic, and 84% overall, since `WebotsPlatform` and the entry point only run inside Webots. The HTML report lands in `build/coverage/index.html`.
 
 ---
 
@@ -300,7 +300,7 @@ docs/
 4. A real grab check, calibrated from the "camera now sees N green px" line v2 logs after each lift
 
 ### Original roadmap
-5. **Dynamic pathfinding**: replace hardcoded waypoints with A* or Dijkstra. *Started:* [an A* analysis](docs/route-planner.md) finds routes about 14% shorter than the hand-tuned ones after the clearing phase, and shows there's no route at all without it
+5. **Dynamic pathfinding**: replace hardcoded waypoints with A* or Dijkstra. *Started:* [an A* analysis](docs/route-planner.md) finds routes about 13-14% shorter than the hand-tuned ones after the clearing phase (and no route at all without it). v2 can use them via `Config.USE_PLANNED_ROUTES`, off by default; on the robot model the mission finishes about 9% sooner
 6. **Obstacle mapping**: build a real-time obstacle map from the distance sensors
 7. **Machine learning**: train a CNN for robust detection in variable lighting
 8. **Configuration file**: externalise parameters. *Partly done: v2 gathers them all in `Config.java`*

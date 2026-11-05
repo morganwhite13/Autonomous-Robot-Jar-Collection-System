@@ -51,6 +51,12 @@ class RoutePlannerTest {
   }
 
   @Test
+  void storedPlannedRoutesStillMatchThePlanner() {
+    assertEquals(RoutePlannerReport.plannedCarry(world), Routes.PLANNED_SEARCH_TO_DROPOFF);
+    assertEquals(RoutePlannerReport.plannedReturn(world), Routes.PLANNED_DROPOFF_TO_SEARCH);
+  }
+
+  @Test
   void withoutTheClearingPhaseThereIsNoRoute() {
     RoutePlanner planner = RoutePlanner.forWorld(world, true, RoutePlannerReport.CLEARANCE_CM);
     assertTrue(planner.plan(Routes.SEARCH_POINT, Routes.DROPOFF_ENTRY).isEmpty());

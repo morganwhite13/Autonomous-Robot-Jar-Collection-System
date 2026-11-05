@@ -26,8 +26,15 @@ final class Mission {
   private final Navigator nav;
   private final JarHandler jars;
 
+  private final Routes.RouteSet routes;
+
   Mission(RobotPlatform robot) {
+    this(robot, Config.USE_PLANNED_ROUTES ? Routes.PLANNED : Routes.HAND_TUNED);
+  }
+
+  Mission(RobotPlatform robot, Routes.RouteSet routes) {
     this.robot = robot;
+    this.routes = routes;
     this.stats = new MissionStats(robot::elapsedMs);
     this.nav = new Navigator(robot, stats);
     this.jars = new JarHandler(robot, nav, stats, new Random(Config.RANDOM_SEED));
@@ -40,6 +47,9 @@ final class Mission {
   /** Runs the whole mission and returns the number of jars delivered. */
   int run() {
     startUp();
+    if (routes != Routes.HAND_TUNED) {
+      Log.info("Using the " + routes.name + " carry and return routes");
+    }
 
     Log.phase("PHASE 1: Clearing path");
     stats.beginPhase(PHASE_CLEARING);
@@ -54,7 +64,7 @@ final class Mission {
       stats.beginJar(jarNumber);
 
       stats.beginPhase(PHASE_TO_SEARCH);
-      List<Vec2> route = atDropoff ? Routes.DROPOFF_TO_SEARCH : Routes.TO_SEARCH_POINT;
+      List<Vec2> route = atDropoff ? routes.dropoffToSearch : Routes.TO_SEARCH_POINT;
       nav.followRoute(route);
       atDropoff = false;
 
@@ -72,7 +82,7 @@ final class Mission {
       failedInARow = 0;
 
       stats.beginPhase(PHASE_TO_DROPOFF);
-      nav.followRoute(Routes.SEARCH_TO_DROPOFF);
+      nav.followRoute(routes.searchToDropoff);
 
       stats.beginPhase(PHASE_PLACE);
       jars.place(delivered);

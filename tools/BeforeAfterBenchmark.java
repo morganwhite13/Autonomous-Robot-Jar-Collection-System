@@ -193,6 +193,14 @@ public class BeforeAfterBenchmark {
         delivered + "/5 jars, " + f0(robot.elapsedMs() / 1000.0) + " s simulated, "
             + s.driveStalls + " stalls, " + s.turnTimeouts + " turn timeouts");
 
+    KinematicRobot plannedRobot = robot(world.robotStart, 90);
+    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
+      plannedRobot.jars.add(jar.center);
+    }
+    int plannedDelivered = new Mission(plannedRobot, Routes.PLANNED).run();
+    row(md, "Whole mission with v2's opt-in A*-planned routes (`Config.USE_PLANNED_ROUTES`)", "-",
+        plannedDelivered + "/5 jars, " + f0(plannedRobot.elapsedMs() / 1000.0) + " s simulated");
+
     KinematicRobot empty = new KinematicRobot(Vec2.of(850, 60), 270).withStepLimit(400_000);
     Mission noJars = new Mission(empty);
     String v2 = "ends after " + noJars.run() + " jars, " + f0(empty.elapsedMs() / 1000.0) + " s";
