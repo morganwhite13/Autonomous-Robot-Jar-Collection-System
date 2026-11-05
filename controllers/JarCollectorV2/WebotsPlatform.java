@@ -47,6 +47,8 @@ final class WebotsPlatform implements RobotPlatform {
     lift = robot.getMotor("lift motor");
     leftFinger = robot.getMotor("left finger motor");
     rightFinger = robot.getMotor("right finger motor");
+    leftFinger.enableForceFeedback(timeStep);
+    rightFinger.enableForceFeedback(timeStep);
 
     leftSide = enable(robot.getDistanceSensor("so0"));
     leftAngled = enable(robot.getDistanceSensor("so1"));
@@ -136,6 +138,17 @@ final class WebotsPlatform implements RobotPlatform {
   public void setLift(double position) {
     lift.setVelocity(Config.GRIPPER_SPEED);
     lift.setPosition(position);
+  }
+
+  @Override
+  public double gripEffort() {
+    double max = Math.min(leftFinger.getMaxForce(), rightFinger.getMaxForce());
+    if (!(max > 0)) {
+      return Double.NaN;
+    }
+    // Each finger pushes inwards; the sign depends on its slider axis, so use magnitudes.
+    return (Math.abs(leftFinger.getForceFeedback()) + Math.abs(rightFinger.getForceFeedback()))
+        / (2 * max);
   }
 
   @Override

@@ -38,6 +38,7 @@ final class MissionStats {
   private int driveTimeouts;
   private int turnTimeouts;
   private int failedSearches;
+  private int missedGrabs;
 
   MissionStats(LongSupplier clockMs) {
     this.clockMs = clockMs;
@@ -82,6 +83,10 @@ final class MissionStats {
     failedSearches++;
   }
 
+  void recordMissedGrab() {
+    missedGrabs++;
+  }
+
   void recordDriveStall() {
     driveStalls++;
   }
@@ -108,6 +113,11 @@ final class MissionStats {
 
   int failedSearches() {
     return failedSearches;
+  }
+
+  /** Grabs the grab check undid because the fingers weren't holding anything. */
+  int missedGrabs() {
+    return missedGrabs;
   }
 
   /** Drive stalls, drive timeouts and turn timeouts: legs that didn't end where planned. */
@@ -164,8 +174,9 @@ final class MissionStats {
           j.delivered ? "delivered" : "not delivered"));
     }
     sb.append(String.format(Locale.ROOT,
-        "%nAnomalies: drive stalls=%d, drive timeouts=%d, turn timeouts=%d, failed searches=%d%n",
-        driveStalls, driveTimeouts, turnTimeouts, failedSearches));
+        "%nAnomalies: drive stalls=%d, drive timeouts=%d, turn timeouts=%d, failed searches=%d, "
+            + "missed grabs=%d%n",
+        driveStalls, driveTimeouts, turnTimeouts, failedSearches, missedGrabs));
     sb.append("==============================================================");
     return sb.toString();
   }

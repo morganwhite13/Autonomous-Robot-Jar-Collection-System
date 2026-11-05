@@ -98,17 +98,42 @@ class LegacyBehaviourTest {
   }
 
   @Test
-  void v1MissionWithLagAndSlipDeliversTwoJarsThenPushesAgainstABox() throws Exception {
+  void v1MissionWithLagAndSlipDriftsIntoAWoodenBoxWhileClearing() throws Exception {
     WorldFile world = WorldFile.read(Path.of("worlds/ProjectWorld2025.wbt"));
-    KinematicRobot robot = KinematicRobot.atMissionStart(world).withImperfections(2, 0.7).withStepLimit(30_000);
+    KinematicRobot robot = KinematicRobot.atMissionStart(world).withImperfections(2, 0.7)
+        .withStepLimit(30_000);
     LegacyV1Mission.Result result = new LegacyV1Mission(robot, 1).run();
     assertFalse(result.finished);
-    assertEquals(2, result.delivered);
-    assertTrue(result.activity.contains("`navigateFromDropoffToSearch`"), result.activity);
-    WorldFile.Obstacle box = world.staticObstacles().stream()
-        .filter(o -> o.name.equals("wooden box(5)")).findFirst().orElseThrow();
-    assertTrue(RoutePlanner.distanceToPolygon(robot.positionCm(), box.corners) < 16);
+    assertEquals(0, robot.deliveredJars.size());
+    assertTrue(result.activity.startsWith("driving to")
+        && result.activity.contains("`hardcodedPathPushing`"), result.activity);
+    boolean againstAWoodenBox = world.ofKind(WorldFile.Kind.WOODEN_BOX).stream().anyMatch(o ->
+        RoutePlanner.distanceToPolygon(robot.positionCm(), o.corners)
+            < KinematicRobot.ROBOT_RADIUS_CM + 1);
+    assertTrue(againstAWoodenBox, "stuck at " + robot.positionCm());
     // Stuck long before the run was stopped: no stall detection.
     assertTrue(result.activitySinceMs < robot.elapsedMs() / 2);
+  }
+
+  @Test
+  void v1NeverFinishesTheMissionOnTheExtremeRobotVariants() throws Exception {
+    WorldFile world = WorldFile.read(Path.of("worlds/ProjectWorld2025.wbt"));
+    for (int lag : new int[] {0, 3}) {
+      for (double turnRate : new double[] {0.6, 1.0}) {
+        KinematicRobot robot = KinematicRobot.atMissionStart(world)
+            .withImperfections(lag, turnRate).withStepLimit(100_000);
+        assertFalse(new LegacyV1Mission(robot, 1).run().finished, lag + " / " + turnRate);
+      }
+    }
+  }
+
+  @Test
+  void v1ReportsAGrabAsDoneEvenWhenTheJarSlipsOut() {
+    // executeGrab printed "Verifying grab..." (line 422) but checked nothing.
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    robot.jars.add(Vec2.of(60, 0));
+    robot.grabsThatMiss = 1;
+    assertTrue(new LegacyV1Mission(robot, 1).intelligentJarSearch());
+    assertNull(robot.heldJar);
   }
 }

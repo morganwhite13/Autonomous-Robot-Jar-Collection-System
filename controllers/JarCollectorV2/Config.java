@@ -131,4 +131,19 @@ final class Config {
   static final int GRAB_HOLD_STEPS = 20;
   static final int RELEASE_STEPS = 50;
   static final int BACKUP_AFTER_RELEASE_STEPS = 50;
+
+  // ------------------------------------------------------------------ grab check (new)
+  /**
+   * new, off by default: after lifting, check that the fingers are squeezing something and
+   * release and try again if not. v1 printed "Verifying grab..." but checked nothing, so a jar
+   * that slipped out was "delivered" anyway. Off until a Webots run confirms the threshold below;
+   * every grab logs its grip effort either way.
+   */
+  static final boolean VERIFY_GRABS = false;
+  /**
+   * new: grip effort (finger motor force as a fraction of its maximum) that counts as holding a
+   * jar. Fingers closing on a jar stop against it and push at their limit (about 1); fingers that
+   * close on nothing reach their target and stop pushing (about 0).
+   */
+  static final double GRIP_EFFORT_HOLDING = 0.5;
 }

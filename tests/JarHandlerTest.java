@@ -325,4 +325,65 @@ class JarHandlerTest {
     }
     assertEquals(Config.RELEASE_STEPS, stillSteps);
   }
+
+  // Grab check (Config.VERIFY_GRABS, off by default).
+
+  private static JarHandler checkingHandler(RobotPlatform robot, MissionStats stats) {
+    return new JarHandler(robot, new Navigator(robot, stats), stats, new Random(1), true);
+  }
+
+  @Test
+  void grabCheckLetsGoAndTriesAgainWhenTheJarSlipsOut() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    robot.jars.add(Vec2.of(60, 0));
+    robot.grabsThatMiss = 1;
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    assertTrue(checkingHandler(robot, stats).searchAndGrab());
+    assertNotNull(robot.heldJar);
+    assertEquals(1, stats.missedGrabs());
+  }
+
+  @Test
+  void aMissedGrabOpensAndLowersTheGripper() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    robot.jars.add(Vec2.of(20, 0));
+    robot.grabsThatMiss = 1;
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    assertFalse(checkingHandler(robot, stats).grab());
+    assertEquals(Config.FINGERS_OPEN, robot.fingers);
+    assertEquals(Config.LIFT_DOWN, robot.lift);
+    int v1Steps = Config.GRAB_SETTLE_STEPS + Config.GRAB_CLOSE_STEPS + Config.GRAB_LIFT_STEPS
+        + Config.GRAB_HOLD_STEPS;
+    assertEquals(v1Steps + Config.RELEASE_STEPS, robot.stepsTaken());
+  }
+
+  @Test
+  void withoutTheGrabCheckASlippedJarStillCountsAsGrabbed() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    robot.jars.add(Vec2.of(60, 0));
+    robot.grabsThatMiss = 1;
+    assertTrue(handler(robot).searchAndGrab()); // the default, like v1
+    assertNull(robot.heldJar);
+  }
+
+  @Test
+  void grabCheckTrustsAGripItCannotMeasure() {
+    ScriptedRobot robot = new ScriptedRobot(); // gripEffort() is NaN
+    robot.touchedAtStep = step -> true;
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    assertTrue(checkingHandler(robot, stats).grab());
+    assertEquals(0, stats.missedGrabs());
+  }
+
+  @Test
+  void grabCheckThresholdIsInclusive() {
+    ScriptedRobot exactly = new ScriptedRobot() {
+      @Override
+      public double gripEffort() {
+        return Config.GRIP_EFFORT_HOLDING;
+      }
+    };
+    exactly.touchedAtStep = step -> true;
+    assertTrue(checkingHandler(exactly, new MissionStats(exactly::elapsedMs)).grab());
+  }
 }

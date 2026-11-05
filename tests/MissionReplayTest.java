@@ -60,8 +60,8 @@ class MissionReplayTest {
 
   @Test
   void showsTheMeasuredOutcome() {
-    assertTrue(svg.contains(">2/5 jars, stuck from 412 s<"), "v1 status");
-    assertTrue(svg.contains(">v1 stuck from 412 s</text>"), "v1 label");
+    assertTrue(svg.contains(">0/5 jars, stuck from 47 s<"), "v1 status");
+    assertTrue(svg.contains(">v1 stuck from 47 s</text>"), "v1 label");
     assertTrue(svg.contains("pushing against a wooden box"), "v1 cause");
     assertTrue(svg.contains(">5/5 jars, done at 864 s<"), "v2 status");
   }

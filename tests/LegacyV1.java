@@ -82,9 +82,13 @@ final class LegacyV1 {
     return (int) (bearing);
   }
 
-  /** What v1's compass function returns for a physical heading in [0, 360). */
+  /**
+   * What v1's compass function returns for a physical heading: the reading a perfect compass
+   * gives at that heading (FrameConventionTest's convention), run through the formula above.
+   */
   static int compassDegrees(double headingDeg) {
-    return (int) (headingDeg >= 180 ? headingDeg - 360 : headingDeg);
+    double psi = Math.toRadians(headingDeg - 90); // yaw 0 faces +y (90 deg) in this frame
+    return compassDegrees(new double[] {Math.cos(psi), 0, Math.sin(psi)});
   }
 
   /** countColor green test, line 543. */
@@ -183,12 +187,16 @@ final class LegacyV1 {
    */
   static int moveHardcodedAhead(RobotPlatform robot, double x1, double y1, double x2, double y2,
       int maxSteps) {
-    double desiredDistance = Math.hypot(x2 - x1, y2 - y1);
+    double xDiff = x2 - x1;
+    double yDiff = y2 - y1;
+    double desiredDistance = Math.sqrt((xDiff) * (xDiff) + (yDiff) * (yDiff));
     robot.drive(MAX_SPEED, MAX_SPEED);
     for (int steps = 1; steps <= maxSteps; steps++) {
       robot.step();
       Vec2 p = robot.positionCm();
-      if (Math.hypot(p.x - x1, p.y - y1) >= desiredDistance) {
+      double x = p.x;
+      double y = p.y;
+      if (Math.sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1)) >= desiredDistance) {
         robot.stop();
         return steps;
       }

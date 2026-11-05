@@ -11,7 +11,8 @@ import java.util.Random;
  *   <li>Prints are replaced by {@link #activity}, a note of what the robot is doing, so a run
  *       that never ends can say where it got stuck.</li>
  *   <li>{@code Math.random()} (line 437) is a seeded {@link Random}, so runs are repeatable.</li>
- *   <li>v1's loops have no limits of their own. A run ends when the model's step limit throws
+ *   <li>v1's route-following and main loops have no limits of their own (the scan, approach
+ *       and rotateByDegrees do). A run ends when the model's step limit throws
  *       {@link RobotPlatform.SimulationEnded}, which is how Webots ends a controller too.</li>
  * </ul>
  */
@@ -19,6 +20,10 @@ final class LegacyV1Mission {
 
   /** How a run went. */
   static final class Result {
+    /**
+     * Jars delivered as v1 counts them (5 - jarsToGo). v1 never checks its grip, so this can be
+     * more than the model's {@code deliveredJars}, which is what actually reached the pads.
+     */
     final int delivered;
     final long elapsedMs;
     final boolean finished;
@@ -112,7 +117,7 @@ final class LegacyV1Mission {
   }
 
   /** intelligentJarSearch, lines 156-197. */
-  private boolean intelligentJarSearch() {
+  boolean intelligentJarSearch() {
     int fullRotationAttempts = 0;
     int maxFullRotations = 3;
     while (fullRotationAttempts < maxFullRotations) {
@@ -264,14 +269,14 @@ final class LegacyV1Mission {
     robot.stop();
   }
 
-  /** turnToAngle, lines 494-502. */
+  /** turnToAngle, lines 494-501. */
   private void turnToAngle(int targetAngle) {
     int currentAngle = compass();
     int diff = (targetAngle - currentAngle + 540) % 360 - 180;
     rotateByDegrees(diff);
   }
 
-  /** placeJar, lines 627-653. */
+  /** placeJar, lines 628-654. */
   private void placeJar() {
     executeHardcodedPath("placeJar", LegacyV1.placeJarPath(jarsToGo));
     doing("releasing the jar");
@@ -284,7 +289,7 @@ final class LegacyV1Mission {
   }
 
   /**
-   * executeHardcodedPath, lines 684-697: each leg starts from wherever the robot is, turns towards
+   * executeHardcodedPath, lines 686-697: each leg starts from wherever the robot is, turns towards
    * the waypoint and drives the leg's length (makeHardcodedTurn and moveHardcodedAhead, ported in
    * {@link LegacyV1} with no step limit of their own).
    */

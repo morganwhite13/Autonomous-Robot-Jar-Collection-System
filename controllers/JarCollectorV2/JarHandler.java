@@ -33,12 +33,19 @@ final class JarHandler {
   private final Navigator nav;
   private final MissionStats stats;
   private final Random random;
+  private final boolean verifyGrabs;
 
   JarHandler(RobotPlatform robot, Navigator nav, MissionStats stats, Random random) {
+    this(robot, nav, stats, random, Config.VERIFY_GRABS);
+  }
+
+  JarHandler(RobotPlatform robot, Navigator nav, MissionStats stats, Random random,
+      boolean verifyGrabs) {
     this.robot = robot;
     this.nav = nav;
     this.stats = stats;
     this.random = random;
+    this.verifyGrabs = verifyGrabs;
   }
 
   /** v1 intelligentJarSearch: up to 3 scan-and-approach attempts. True once a jar is held. */
@@ -190,7 +197,10 @@ final class JarHandler {
     return "v1 rule: " + Vision.countGreen(image, Vision.V1_COMPATIBLE_MARGIN).total() + " px";
   }
 
-  /** v1 executeGrab: same positions and timings. */
+  /**
+   * v1 executeGrab: same positions and timings. With the grab check on, a grab whose fingers
+   * aren't squeezing anything afterwards is undone and counts as a failed attempt.
+   */
   boolean grab() {
     if (!robot.jarTouched()) {
       Log.info("Lost contact before grabbing");
@@ -205,10 +215,23 @@ final class JarHandler {
     robot.setLift(Config.LIFT_UP);
     robot.waitSteps(Config.GRAB_LIFT_STEPS);
     robot.waitSteps(Config.GRAB_HOLD_STEPS);
-    // v1 printed "Verifying grab..." but did not check anything. v2 does not claim to verify:
-    // it logs what the camera sees so a real check can be calibrated from actual runs.
+    // v1 printed "Verifying grab..." but did not check anything. v2 logs what the camera sees
+    // and how hard the fingers squeeze, so the check below can be calibrated from real runs.
+    double effort = robot.gripEffort();
+    String effortText = Double.isNaN(effort) ? "not measured"
+        : String.format(Locale.ROOT, "%.2f", effort);
     Log.info("Grab sequence complete (camera now sees "
-        + Vision.countGreen(robot.captureImage()).total() + " green px)");
+        + Vision.countGreen(robot.captureImage()).total() + " green px, grip effort " + effortText
+        + ")");
+    if (verifyGrabs && effort < Config.GRIP_EFFORT_HOLDING) { // NaN: can't tell, assume held
+      Log.warn(String.format(Locale.ROOT, "the fingers aren't holding anything (grip effort "
+          + "%.2f); releasing and trying again", effort));
+      stats.recordMissedGrab();
+      robot.setFingers(Config.FINGERS_OPEN);
+      robot.setLift(Config.LIFT_DOWN);
+      robot.waitSteps(Config.RELEASE_STEPS);
+      return false;
+    }
     return true;
   }
 

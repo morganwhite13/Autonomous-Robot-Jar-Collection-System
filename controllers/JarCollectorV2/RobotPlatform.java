@@ -51,6 +51,15 @@ interface RobotPlatform {
 
   void setLift(double position);
 
+  /**
+   * How hard the fingers are squeezing, as a fraction of the finger motors' maximum force: about 1
+   * when they have closed on a jar, about 0 when they closed on nothing. NaN if it can't be
+   * measured, which the grab check treats as "holding".
+   */
+  default double gripEffort() {
+    return Double.NaN;
+  }
+
   /** One-line description of auxiliary sensors for the start-up self-test. */
   default String diagnostics() {
     return "";

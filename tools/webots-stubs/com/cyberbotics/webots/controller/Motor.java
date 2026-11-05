@@ -6,4 +6,7 @@ package com.cyberbotics.webots.controller;
 public class Motor extends Device {
   public void setPosition(double position) { }
   public void setVelocity(double velocity) { }
+  public void enableForceFeedback(int samplingPeriod) { }
+  public double getForceFeedback() { return 0; }
+  public double getMaxForce() { return 0; }
 }

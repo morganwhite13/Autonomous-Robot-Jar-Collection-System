@@ -30,6 +30,7 @@ public class BeforeAfterBenchmark {
     drift(md);
     blocked(md);
     approach(md);
+    slippedGrab(md);
     failedSearch(md, WorldFile.read(world));
     mission(md, WorldFile.read(world));
 
@@ -45,6 +46,7 @@ public class BeforeAfterBenchmark {
     scan(md);
     drift(md);
     imperfectMission(md, WorldFile.read(world));
+    variants(md, WorldFile.read(world));
 
     System.out.print(md);
   }
@@ -67,10 +69,54 @@ public class BeforeAfterBenchmark {
             + s.driveStalls() + " stalls, " + s.turnTimeouts() + " turn timeouts");
     md.append("\nWith lag and slip, v1's turns do finish, but each one overshoots: the motors keep ")
         .append("turning for the lag after v1 stops them. v1 drives every leg without steering, so ")
-        .append("the error adds up from leg to leg. On the third return trip it is far enough off ")
-        .append("its route to drive into an immovable box, and with no stall detection it pushes ")
-        .append("against it until the simulation ends. v2 steers on every leg and gives up on a ")
-        .append("blocked leg after a few seconds.\n");
+        .append("it drifts off its route, drives into an obstacle, and with no stall detection ")
+        .append("pushes against it until the run is stopped. Where that happens depends on the ")
+        .append("details, so the next section varies them. v2 steers on every leg and gives up on ")
+        .append("a blocked leg after a few seconds.\n");
+  }
+
+  /** The whole mission on a grid of robot variants: does each version finish? */
+  private static void variants(StringBuilder md, WorldFile world) {
+    int[] lags = {0, 1, 2, 3};
+    double[] turnRates = {0.6, 0.7, 0.8, 0.9, 1.0};
+    int runs = 0;
+    int v1Finished = 0;
+    int v1MostJars = 0;
+    int v2Finished = 0;
+    long v2Fastest = Long.MAX_VALUE;
+    long v2Slowest = 0;
+    for (int lag : lags) {
+      for (double turnRate : turnRates) {
+        runs++;
+        KinematicRobot r1 = KinematicRobot.atMissionStart(world).withImperfections(lag, turnRate)
+            .withStepLimit(V1_MISSION_STEP_LIMIT);
+        if (new LegacyV1Mission(r1, 1).run().finished && r1.deliveredJars.size() == 5) {
+          v1Finished++;
+        }
+        v1MostJars = Math.max(v1MostJars, r1.deliveredJars.size());
+
+        KinematicRobot r2 = KinematicRobot.atMissionStart(world).withImperfections(lag, turnRate)
+            .withStepLimit(V1_MISSION_STEP_LIMIT);
+        try {
+          new Mission(r2).run();
+        } catch (RobotPlatform.SimulationEnded e) {
+          // counted as not finished
+        }
+        if (r2.deliveredJars.size() == 5) {
+          v2Finished++;
+          v2Fastest = Math.min(v2Fastest, r2.elapsedMs());
+          v2Slowest = Math.max(v2Slowest, r2.elapsedMs());
+        }
+      }
+    }
+    md.append("\n## Whole mission on ").append(runs).append(" robot variants\n\n")
+        .append("Every combination of motor lag 0-3 steps (0-96 ms) and turn rate 60-100% of ideal, ")
+        .append("each run for up to ").append(String.format(Locale.ROOT, "%,d", V1_MISSION_STEP_LIMIT))
+        .append(" steps. A run finishes when all 5 jars are on the pads.\n\n");
+    md.append("| Check | v1 (before) | v2 (after) |\n|---|---|---|\n");
+    row(md, "Finishes the mission", v1Finished + " of " + runs + " (at most " + v1MostJars
+        + " jars on the pads)", v2Finished + " of " + runs
+        + (v2Finished > 0 ? " (" + f0(v2Fastest / 1000.0) + "-" + f0(v2Slowest / 1000.0) + " s)" : ""));
   }
 
   static final String MISSION_ROW =
@@ -87,8 +133,9 @@ public class BeforeAfterBenchmark {
   static String v1Mission(WorldFile world) {
     KinematicRobot robot = missionRobot(world).withStepLimit(V1_MISSION_STEP_LIMIT);
     LegacyV1Mission.Result r = new LegacyV1Mission(robot, 1).run();
+    int onPads = robot.deliveredJars.size(); // what reached the pads, not what v1 counted
     if (r.finished) {
-      return r.delivered + "/5 jars, " + f0(r.elapsedMs / 1000.0) + " s simulated";
+      return onPads + "/5 jars, " + f0(r.elapsedMs / 1000.0) + " s simulated";
     }
     String against = "";
     for (WorldFile.Obstacle o : world.staticObstacles()) {
@@ -97,7 +144,7 @@ public class BeforeAfterBenchmark {
         against = ", blocked by " + o.name;
       }
     }
-    return r.delivered + "/5 jars, never finishes: stuck from " + f0(r.activitySinceMs / 1000.0)
+    return onPads + "/5 jars, never finishes: stuck from " + f0(r.activitySinceMs / 1000.0)
         + " s " + r.activity + against + ", still at it when stopped at "
         + f0(r.elapsedMs / 1000.0) + " s";
   }
@@ -197,6 +244,28 @@ public class BeforeAfterBenchmark {
         v2Grabbed ? "yes" : "no");
   }
 
+  /** A jar 60 cm ahead that slips out of the fingers on the first grab. */
+  private static void slippedGrab(StringBuilder md) {
+    KinematicRobot r1 = robot(Vec2.of(0, 0), 0);
+    r1.jars.add(Vec2.of(60, 0));
+    r1.grabsThatMiss = 1;
+    boolean v1Says = new LegacyV1Mission(r1, 1).intelligentJarSearch();
+
+    KinematicRobot r2 = robot(Vec2.of(0, 0), 0);
+    r2.jars.add(Vec2.of(60, 0));
+    r2.grabsThatMiss = 1;
+    MissionStats stats = new MissionStats(r2::elapsedMs);
+    boolean v2Says = new JarHandler(r2, new Navigator(r2, stats), stats, new java.util.Random(1),
+        true).searchAndGrab();
+    row(md, "A jar slips out of the gripper on the first grab",
+        (v1Says ? "reports success" : "reports failure") + ", "
+            + (r1.heldJar == null ? "holding nothing" : "holding the jar"),
+        "with the grab check on (`Config.VERIFY_GRABS`, off by default): "
+            + (v2Says ? "reports success" : "reports failure") + ", "
+            + (r2.heldJar == null ? "holding nothing" : "holding the jar") + " after "
+            + (stats.missedGrabs() + 1) + " grabs");
+  }
+
   private static void failedSearch(StringBuilder md, WorldFile world) {
     List<Vec2> v1Route = Routes.DROPOFF_TO_SEARCH; // v1 used this whenever jarsToGo != 5
     double v1Len = Routes.length(Routes.SEARCH_POINT, v1Route);
@@ -235,11 +304,12 @@ public class BeforeAfterBenchmark {
     md.append("\nThe whole-mission rows run a line-for-line port of v1's `main` loop ")
         .append("(`tests/LegacyV1Mission.java`) and the real v2 classes from the world's start pose, ")
         .append("with the same waypoints and gripper timings (checked by `RoutesTest`). ")
-        .append("On the ideal model v1 never gets past the box-clearing route. The 5th leg heads ")
-        .append("for 0 deg, and v1 accepts a heading only if its compass reading (0-359) is within 3 deg ")
-        .append("of the target without wrapping, so near 0 deg only 0, 1 and 2 count. At full speed ")
-        .append("the robot turns about 5.4 deg per step, so it keeps stepping over that window. v2 ")
-        .append("compares headings across the 0/360 seam and slows down near the target.\n");
+        .append("On the ideal model v1 never gets past the box-clearing route. It turns at full ")
+        .append("speed, about 5.4 deg per step, but stops only when its whole-degree compass reading ")
+        .append("is strictly within 3 of the target: a window about 5 deg wide, and only 4 deg at ")
+        .append("0 deg, where the check doesn't wrap around 0/360. A window narrower than one step ")
+        .append("can be stepped over forever, and that happens on the 5th leg, which heads for 0 ")
+        .append("deg. v2 slows down near the target and compares headings across the seam.\n");
   }
 
   private static JarHandler handler(KinematicRobot robot) {

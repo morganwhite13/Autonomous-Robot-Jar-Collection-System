@@ -36,15 +36,15 @@ This repository holds **two versions side by side**:
 
 | | v1 (before) | v2 (after) |
 |---|---|---|
-| Whole mission on the robot model | Never finishes. Stuck turning on the box-clearing route (0/5 jars); with motor lag and wheel slip, delivers 2/5 then pushes against a wooden box forever | 5/5 jars in 815 s (864 s with lag and slip) |
+| Whole mission on the robot model | Never finishes on any of 20 robot variants (at most 2 of 5 jars delivered): it gets stuck turning back and forth, or drifts into a wooden box and pushes against it | Delivers all 5 on all 20 variants, in 807-902 s |
 | After a failed search for jars 2-5 | Drives a 17.8 m straight line through 4 immovable wooden boxes | Returns 0.8 m to the search point |
 | Robot blocked while driving | Pushes forever | Detects the stall in ~4 s and moves on |
 | "360°" jar scan | Covers ~271° (fixed 200 steps); 188° with wheel slip | Covers 370°, measured by the compass, with or without slip |
-| Turn finishes (6,240 start/target pairs, kinematic model) | 91.8% at the ideal turn rate (can bounce across the ±3° window forever); 100% with slip | 100% in both |
+| Turn finishes (6,240 start/target pairs, kinematic model) | 91.7% at the ideal turn rate (can bounce across the ±3° window forever); 100% with slip | 100% in both |
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 121 JUnit tests covering 99% of v2's logic and catching 95% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 131 JUnit tests covering 99% of v2's logic and catching 94% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -52,9 +52,9 @@ The numbers come from running ports of v1's methods and the real v2 classes on t
 
 ### Both versions running the whole mission
 
-![Animated replay of v1 and v2 running the whole mission on the robot model: v1 delivers two jars, then drives into a wooden box on the way back for the third and pushes against it from 412 s; v2 delivers all five jars in 864 s](docs/images/mission-replay.svg)
+![Animated replay of v1 and v2 running the whole mission on the robot model: v1 drifts off its route while clearing boxes and pushes against a wooden box from 47 s; v2 delivers all five jars in 864 s](docs/images/mission-replay.svg)
 
-A replay at 30x speed, on the robot model with motor lag and wheel slip. v1 delivers two jars. On the way back for the third it has drifted off its route, drives into a wooden box, and pushes against it for the rest of the run. v2 delivers all five. Generated from the same runs as the benchmark by `tools/MissionReplay.java`.
+A replay at 30x speed, on the robot model with motor lag and wheel slip. v1 never steers on a leg, so it drifts off its route while clearing boxes. At 47 s it drives into a wooden box and, with no stall detection, pushes against it for the rest of the run. v2 delivers all five jars. Generated from the same runs as the benchmark by `tools/MissionReplay.java`.
 
 ---
 
@@ -214,15 +214,15 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 121 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 131 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
 ```
 
-Add `--coverage` to measure line coverage of the v2 controller with JaCoCo. It's currently 99% of the logic, and 88% overall, since `WebotsPlatform` and the entry point only run inside Webots. The HTML report lands in `build/coverage/index.html`.
+Add `--coverage` to measure line coverage of the v2 controller with JaCoCo. It's currently 99% of the logic, and 87% overall, since `WebotsPlatform` and the entry point only run inside Webots. The HTML report lands in `build/coverage/index.html`.
 
-Coverage only shows which lines ran, not whether a test would notice if they were wrong. `tools/mutation-test.sh` checks that: [PIT](https://pitest.org/) makes hundreds of small changes to v2's logic (flips a comparison, drops a call, returns a constant) and reruns the tests against each one. Currently 95% of the changes make a test fail; CI requires at least 90%. The rest are reviewed in [BEFORE_AND_AFTER.md](docs/BEFORE_AND_AFTER.md#how-this-was-checked-and-what-still-needs-checking).
+Coverage only shows which lines ran, not whether a test would notice if they were wrong. `tools/mutation-test.sh` checks that: [PIT](https://pitest.org/) makes hundreds of small changes to v2's logic (flips a comparison, drops a call, returns a constant) and reruns the tests against each one. Currently 94% of the changes make a test fail; CI requires at least 90%. The rest are reviewed in [BEFORE_AND_AFTER.md](docs/BEFORE_AND_AFTER.md#how-this-was-checked-and-what-still-needs-checking).
 
 ---
 

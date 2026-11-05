@@ -149,4 +149,34 @@ class MissionTest {
     }
     assertEquals(robot.elapsedMs(), total);
   }
+
+  @Test
+  void grabCheckRecoversFromJarsThatSlipOut() {
+    KinematicRobot robot = robotWithJars();
+    robot.grabsThatMiss = 2;
+    Mission mission = new Mission(robot, new Mission.Options().verifyGrabs(true));
+    assertEquals(5, mission.run());
+    assertEquals(5, robot.deliveredJars.size());
+    assertEquals(2, mission.stats().missedGrabs());
+  }
+
+  @Test
+  void withoutTheGrabCheckASlippedJarIsCountedButNeverDelivered() {
+    KinematicRobot robot = robotWithJars();
+    robot.grabsThatMiss = 1;
+    assertEquals(5, new Mission(robot).run()); // what the robot believes
+    assertEquals(4, robot.deliveredJars.size()); // what is actually on the pads
+    assertEquals(1, robot.jars.size()); // still on the floor
+  }
+
+  @Test
+  void deliversAllJarsOnTheExtremeRobotVariants() {
+    for (int lag : new int[] {0, 3}) {
+      for (double turnRate : new double[] {0.6, 1.0}) {
+        KinematicRobot robot = robotWithJars().withImperfections(lag, turnRate);
+        assertEquals(5, new Mission(robot).run(), lag + " / " + turnRate);
+        assertEquals(5, robot.deliveredJars.size());
+      }
+    }
+  }
 }

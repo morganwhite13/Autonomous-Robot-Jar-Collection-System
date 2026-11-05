@@ -6,7 +6,7 @@ import java.util.function.IntPredicate;
  * bumper is pressed on chosen steps, the heading turns at a fixed rate whenever the wheels turn,
  * and the position can orbit a circle regardless of the wheel commands.
  */
-final class ScriptedRobot implements RobotPlatform {
+class ScriptedRobot implements RobotPlatform {
   int left;
   int center;
   int right;

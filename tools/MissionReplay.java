@@ -107,7 +107,7 @@ public class MissionReplay {
       v1.stuckSinceMs = result.activitySinceMs;
       v1.stuckText = describeStuck(world, r1, result);
       v1.statuses.add(new Status(result.activitySinceMs,
-          result.delivered + "/5 jars, stuck from " + seconds(result.activitySinceMs)));
+          r1.deliveredJars.size() + "/5 jars, stuck from " + seconds(result.activitySinceMs)));
     }
 
     int holdSamples = (int) Math.round(HOLD_S * SPEEDUP * 1000 / (SAMPLE_STEPS * STEP_MS));

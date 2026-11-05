@@ -28,16 +28,40 @@ final class Mission {
 
   private final Routes.RouteSet routes;
 
+  /** v2's optional behaviours. Each starts at its switch in {@link Config}. */
+  static final class Options {
+    Routes.RouteSet routes = Config.USE_PLANNED_ROUTES ? Routes.PLANNED : Routes.HAND_TUNED;
+    boolean verifyGrabs = Config.VERIFY_GRABS;
+
+    Options routes(Routes.RouteSet set) {
+      routes = set;
+      return this;
+    }
+
+    Options verifyGrabs(boolean on) {
+      verifyGrabs = on;
+      return this;
+    }
+  }
+
+  private final Options options;
+
   Mission(RobotPlatform robot) {
-    this(robot, Config.USE_PLANNED_ROUTES ? Routes.PLANNED : Routes.HAND_TUNED);
+    this(robot, new Options());
   }
 
   Mission(RobotPlatform robot, Routes.RouteSet routes) {
+    this(robot, new Options().routes(routes));
+  }
+
+  Mission(RobotPlatform robot, Options options) {
     this.robot = robot;
-    this.routes = routes;
+    this.options = options;
+    this.routes = options.routes;
     this.stats = new MissionStats(robot::elapsedMs);
     this.nav = new Navigator(robot, stats);
-    this.jars = new JarHandler(robot, nav, stats, new Random(Config.RANDOM_SEED));
+    this.jars = new JarHandler(robot, nav, stats, new Random(Config.RANDOM_SEED),
+        options.verifyGrabs);
   }
 
   MissionStats stats() {
@@ -49,6 +73,9 @@ final class Mission {
     startUp();
     if (routes != Routes.HAND_TUNED) {
       Log.info("Using the " + routes.name + " carry and return routes");
+    }
+    if (options.verifyGrabs) {
+      Log.info("Grab check on: a grab that isn't holding anything is retried");
     }
     clearPath();
 

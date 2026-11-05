@@ -54,6 +54,10 @@ final class KinematicRobot implements RobotPlatform {
   final List<Vec2> jars = new ArrayList<>();
   final List<Vec2> deliveredJars = new ArrayList<>();
   Vec2 heldJar;
+  /** How many of the next grabs miss: the jar slips out of the fingers and stays on the floor. */
+  int grabsThatMiss;
+  /** True from a missed grab until the fingers open again. */
+  private boolean missedThisGrab;
   double fingers = Config.FINGERS_OPEN;
   double lift = Config.LIFT_DOWN;
   /**
@@ -76,8 +80,11 @@ final class KinematicRobot implements RobotPlatform {
     this.timeStepMs = timeStepMs;
   }
 
-  /** Close to the Pioneer's half-width: touching a wall or wooden box blocks the robot. */
-  static final double ROBOT_RADIUS_CM = 15;
+  /**
+   * Collision radius for walls and wooden boxes: half the Pioneer 3-DX's 38 cm width. The body is
+   * longer than it is wide, so this under-counts head-on contact; the routes keep 30 cm clear.
+   */
+  static final double ROBOT_RADIUS_CM = 19;
 
   /**
    * The mission's starting state: the world's start pose (facing +y: the robot's rotation in the
@@ -250,6 +257,9 @@ final class KinematicRobot implements RobotPlatform {
   @Override
   public void setFingers(double position) {
     fingers = position;
+    if (position >= Config.FINGERS_OPEN - GRIPPER_TOLERANCE) {
+      missedThisGrab = false;
+    }
     if (position >= Config.FINGERS_OPEN - GRIPPER_TOLERANCE && heldJar != null) {
       // Release in front of the robot.
       double h = Math.toRadians(heading);
@@ -263,10 +273,23 @@ final class KinematicRobot implements RobotPlatform {
   public void setLift(double position) {
     lift = position;
     if (position <= Config.LIFT_UP + GRIPPER_TOLERANCE
-        && fingers <= Config.FINGERS_CLOSED + GRIPPER_TOLERANCE && heldJar == null) {
-      heldJar = touchedJar();
+        && fingers <= Config.FINGERS_CLOSED + GRIPPER_TOLERANCE && heldJar == null
+        && !missedThisGrab) {
+      Vec2 jar = touchedJar();
+      if (jar != null && grabsThatMiss > 0) {
+        grabsThatMiss--;
+        missedThisGrab = true;
+        return;
+      }
+      heldJar = jar;
       jars.remove(heldJar);
     }
+  }
+
+  /** Closed fingers squeeze at their limit if they hold a jar; otherwise they don't push. */
+  @Override
+  public double gripEffort() {
+    return heldJar != null && fingers <= Config.FINGERS_CLOSED + GRIPPER_TOLERANCE ? 1.0 : 0.0;
   }
 
   @Override
