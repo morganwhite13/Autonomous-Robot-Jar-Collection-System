@@ -30,9 +30,11 @@ public class Observer {
 
     Node robotNode = supervisor.getFromDef("ROBOT");
     Field robot = robotNode.getField("translation");
+    List<Node> jarNodes = new ArrayList<>();
     List<Field> jars = new ArrayList<>();
     for (Node jar = supervisor.getFromDef("JAR0"); jar != null;
         jar = supervisor.getFromDef("JAR" + jars.size())) {
+      jarNodes.add(jar);
       jars.add(jar.getField("translation"));
     }
     DeliveryTracker tracker = new DeliveryTracker(jars.size());
@@ -81,10 +83,32 @@ public class Observer {
     }
     Files.write(outDir.resolve("result.properties"),
         tracker.toProperties(time, time >= limitS).getBytes(StandardCharsets.UTF_8));
+    writeFinalJarPositions(outDir.resolve("jars.csv"), jarNodes);
     System.out.printf(Locale.ROOT, "[observer] finished at %.1f s with %d/%d jars delivered%n",
         time, tracker.delivered(), jars.size());
     if (!ended) {
       supervisor.simulationQuit(0);
     }
+  }
+
+  /**
+   * Where each jar is when the run ends, and whether it is still standing: tells a jar the robot
+   * never reached from one it knocked over or left somewhere awkward.
+   */
+  private static void writeFinalJarPositions(Path file, List<Node> jars) throws IOException {
+    List<String> lines = new ArrayList<>();
+    lines.add("jar,x,y,upright");
+    for (int i = 0; i < jars.size(); i++) {
+      double[] p = jars.get(i).getPosition();
+      double[] m = jars.get(i).getOrientation();
+      boolean upright = m[4] > 0.9; // the jar's own up axis still points (nearly) straight up
+      lines.add(String.format(Locale.ROOT, "%d,%.1f,%.1f,%b", i, p[0] * 100, -p[2] * 100,
+          upright));
+      if (!upright) {
+        System.out.printf(Locale.ROOT, "[observer] jar %d is lying at (%.0f, %.0f)%n", i,
+            p[0] * 100, -p[2] * 100);
+      }
+    }
+    Files.write(file, lines, StandardCharsets.UTF_8);
   }
 }
