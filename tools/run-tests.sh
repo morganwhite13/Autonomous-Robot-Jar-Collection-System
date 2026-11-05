@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds both controllers, runs the unit tests, and regenerates the generated docs
-# (docs/benchmark-results.md and docs/images/mission-map.svg).
+# (docs/benchmark-results.md, docs/images/mission-map.svg and docs/images/before-after.svg).
 #
 # Needs a JDK (11+) and curl. Webots is optional: if WEBOTS_HOME points at a Webots install the
 # controllers are compiled against its real Controller.jar, otherwise against the compile-only
@@ -45,8 +45,9 @@ echo "==> Running tests"
 java -jar "$JUNIT_JAR" execute --class-path "$BUILD/test" --scan-class-path \
   --disable-banner --details=tree --fail-if-no-tests
 
-echo "==> Regenerating docs/benchmark-results.md and docs/images/mission-map.svg"
+echo "==> Regenerating docs/benchmark-results.md and the figures in docs/images"
 java -cp "$BUILD/test" BeforeAfterBenchmark worlds/ProjectWorld2025.wbt > docs/benchmark-results.md
 java -cp "$BUILD/test" MapRenderer worlds/ProjectWorld2025.wbt docs/images/mission-map.svg
+java -cp "$BUILD/test" BeforeAfterFigure docs/images/before-after.svg
 
 echo "==> All good"

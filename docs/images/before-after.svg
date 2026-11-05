@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 395" width="1000" font-family="Helvetica, Arial, sans-serif">
+<title>v1 vs v2 on the same robot model</title>
+<rect width="100%" height="100%" fill="#fcfcfb"/>
+<text x="30" y="44" font-size="26" font-weight="bold" fill="#0b0b0b">v1 vs v2, measured on the same robot model</text>
+<rect x="30.0" y="66.0" width="22" height="14" rx="3" fill="#eb6834"/>
+<text x="60.0" y="78.0" font-size="17" fill="#0b0b0b">v1 (original)</text>
+<rect x="220.0" y="66.0" width="22" height="14" rx="3" fill="#2a78d6"/>
+<text x="250.0" y="78.0" font-size="17" fill="#0b0b0b">v2 (improved)</text>
+<text x="30.0" y="118.0" font-size="19" font-weight="bold" fill="#0b0b0b">How far the "360°" jar scan turns</text>
+<text x="30.0" y="140.0" font-size="15" fill="#52514e">degrees actually rotated</text>
+<text x="30.0" y="194.0" font-size="16" fill="#52514e">Ideal model</text>
+<rect x="150.0" y="170.0" width="155.7" height="22.0" rx="4" fill="#eb6834"/>
+<text x="311.7" y="186.0" font-size="15" fill="#0b0b0b">271°</text>
+<rect x="150.0" y="194.0" width="213.4" height="22.0" rx="4" fill="#2a78d6"/>
+<text x="369.4" y="210.0" font-size="15" fill="#0b0b0b">371°</text>
+<text x="30.0" y="274.0" font-size="16" fill="#52514e">30% wheel slip</text>
+<rect x="150.0" y="250.0" width="107.9" height="22.0" rx="4" fill="#eb6834"/>
+<text x="263.9" y="266.0" font-size="15" fill="#0b0b0b">188°</text>
+<rect x="150.0" y="274.0" width="213.1" height="22.0" rx="4" fill="#2a78d6"/>
+<text x="369.1" y="290.0" font-size="15" fill="#0b0b0b">371°</text>
+<line x1="357.0" y1="158.0" x2="357.0" y2="325.0" stroke="#52514e" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="357.0" y="342.0" font-size="14" fill="#52514e" text-anchor="middle">full turn</text>
+<text x="30.0" y="382.0" font-size="14" fill="#52514e">v1 turns for a fixed time; v2 measures with the compass.</text>
+<text x="435.0" y="118.0" font-size="19" font-weight="bold" fill="#0b0b0b">Driving a 530 cm leg that starts 2.9° off</text>
+<text x="435.0" y="140.0" font-size="15" fill="#52514e">sideways error (cm) vs distance driven (cm)</text>
+<line x1="475.0" y1="330.0" x2="725.0" y2="330.0" stroke="#e4e2dd" stroke-width="1"/>
+<text x="469.0" y="335.0" font-size="14" fill="#52514e" text-anchor="end">0</text>
+<line x1="475.0" y1="273.3" x2="725.0" y2="273.3" stroke="#e4e2dd" stroke-width="1"/>
+<text x="469.0" y="278.3" font-size="14" fill="#52514e" text-anchor="end">10</text>
+<line x1="475.0" y1="216.7" x2="725.0" y2="216.7" stroke="#e4e2dd" stroke-width="1"/>
+<text x="469.0" y="221.7" font-size="14" fill="#52514e" text-anchor="end">20</text>
+<line x1="475.0" y1="160.0" x2="725.0" y2="160.0" stroke="#e4e2dd" stroke-width="1"/>
+<text x="469.0" y="165.0" font-size="14" fill="#52514e" text-anchor="end">30</text>
+<text x="475.0" y="350.0" font-size="14" fill="#52514e" text-anchor="middle">0</text>
+<text x="592.9" y="350.0" font-size="14" fill="#52514e" text-anchor="middle">250</text>
+<text x="710.8" y="350.0" font-size="14" fill="#52514e" text-anchor="middle">500</text>
+<polyline points="475.0,330.0 475.7,329.6 478.7,327.8 481.6,326.0 484.6,324.2 487.5,322.4 490.4,320.6 493.4,318.8 496.3,317.0 499.3,315.2 502.2,313.5 505.1,311.7 508.1,309.9 511.0,308.1 514.0,306.3 516.9,304.5 519.8,302.7 522.8,300.9 525.7,299.1 528.6,297.4 531.6,295.6 534.5,293.8 537.5,292.0 540.4,290.2 543.3,288.4 546.3,286.6 549.2,284.8 552.2,283.0 555.1,281.3 558.0,279.5 561.0,277.7 563.9,275.9 566.9,274.1 569.8,272.3 572.7,270.5 575.7,268.7 578.6,266.9 581.6,265.1 584.5,263.4 587.4,261.6 590.4,259.8 593.3,258.0 596.3,256.2 599.2,254.4 602.1,252.6 605.1,250.8 608.0,249.0 611.0,247.3 613.9,245.5 616.8,243.7 619.8,241.9 622.7,240.1 625.7,238.3 628.6,236.5 631.5,234.7 634.5,232.9 637.4,231.2 640.4,229.4 643.3,227.6 646.2,225.8 649.2,224.0 652.1,222.2 655.1,220.4 658.0,218.6 660.9,216.8 663.9,215.1 666.8,213.3 669.8,211.5 672.7,209.7 675.6,207.9 678.6,206.1 681.5,204.3 684.4,202.5 687.4,200.7 690.3,199.0 693.3,197.2 696.2,195.4 699.1,193.6 702.1,191.8 705.0,190.0 708.0,188.2 710.9,186.4 713.8,184.6 716.8,182.9 719.7,181.1 722.7,179.3 724.9,177.9" fill="none" stroke="#eb6834" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="724.9" cy="177.9" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<polyline points="475.0,330.0 475.7,329.6 478.6,328.1 481.5,326.9 484.4,326.0 487.3,325.2 490.2,324.6 493.1,324.2 496.0,323.8 498.9,323.5 501.9,323.4 504.8,323.2 507.7,323.1 510.7,323.1 513.6,323.0 516.5,323.0 519.5,323.0 522.4,323.1 525.4,323.1 528.3,323.2 531.2,323.3 534.2,323.3 537.1,323.4 540.1,323.5 543.0,323.6 546.0,323.7 548.9,323.8 551.8,323.9 554.8,324.0 557.7,324.1 560.7,324.2 563.6,324.3 566.6,324.4 569.5,324.5 572.4,324.6 575.4,324.7 578.3,324.8 581.3,324.9 584.2,325.0 587.2,325.1 590.1,325.2 593.0,325.3 596.0,325.4 598.9,325.5 601.9,325.6 604.8,325.7 607.8,325.8 610.7,325.9 613.7,326.0 616.6,326.1 619.5,326.2 622.5,326.3 625.4,326.4 628.4,326.5 631.3,326.7 634.3,326.8 637.2,326.9 640.1,327.0 643.1,327.1 646.0,327.2 649.0,327.3 651.9,327.4 654.9,327.5 657.8,327.6 660.7,327.7 663.7,327.8 666.6,327.9 669.6,328.0 672.5,328.1 675.5,328.2 678.4,328.3 681.3,328.4 684.3,328.5 687.2,328.7 690.2,328.8 693.1,328.9 696.1,329.0 699.0,329.1 702.0,329.2 704.9,329.3 707.8,329.4 710.8,329.5 713.7,329.6 716.7,329.7 719.6,329.8 722.6,329.9 725.0,330.0 725.0,330.0" fill="none" stroke="#2a78d6" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="725.0" cy="330.0" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="732.9" y="182.9" font-size="15" fill="#0b0b0b">26.8 cm off</text>
+<text x="733.0" y="335.0" font-size="15" fill="#0b0b0b">1.1 cm</text>
+<text x="435.0" y="382.0" font-size="14" fill="#52514e">v1 drives open-loop; v2 steers towards the waypoint.</text>
+<text x="840.0" y="118.0" font-size="19" font-weight="bold" fill="#0b0b0b">After a failed search (jars 2-5)</text>
+<text x="840.0" y="140.0" font-size="15" fill="#52514e">metres driven before searching again</text>
+<rect x="840.0" y="170.0" width="266.7" height="30.0" rx="4" fill="#eb6834"/>
+<text x="1112.7" y="191.0" font-size="15" fill="#0b0b0b">41.4 m</text>
+<text x="840.0" y="222.0" font-size="14" fill="#52514e">via the drop-off, through 4 immovable boxes</text>
+<rect x="840.0" y="255.0" width="5.2" height="30.0" rx="4" fill="#2a78d6"/>
+<text x="851.2" y="276.0" font-size="15" fill="#0b0b0b">0.8 m</text>
+<text x="840.0" y="307.0" font-size="14" fill="#52514e">straight back to the search point</text>
+</svg>

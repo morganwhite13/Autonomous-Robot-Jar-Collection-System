@@ -31,4 +31,4 @@ jobs:
 
       - name: Generated docs match the code
         if: matrix.java == '21'
-        run: git diff --exit-code -- docs/benchmark-results.md docs/images/mission-map.svg
+        run: git diff --exit-code -- docs/benchmark-results.md docs/images/mission-map.svg docs/images/before-after.svg

@@ -27,7 +27,8 @@ public class MapRenderer {
   private static final double MIN_Y = -260;
   private static final double MAX_Y = 1010;
   private static final double LEGEND_H = 230;
-  private static final String[] PATH_COLORS = {"#e8590c", "#1c7ed6", "#2b8a3e", "#ae3ec9"};
+  // Reference palette categorical slots 2, 1, 3, 4: v1 orange, v2 blue, as in before-after.svg.
+  private static final String[] PATH_COLORS = {"#eb6834", "#2a78d6", "#1baf7a", "#eda100"};
 
   private final StringBuilder svg = new StringBuilder();
 

@@ -15,6 +15,8 @@ This repository holds **two versions side by side**:
 
 👉 **[Full before/after write-up](docs/BEFORE_AND_AFTER.md)**: each fix with the original line numbers, plus [measured results](docs/benchmark-results.md).
 
+**Contents:** [Video demos](#-video-demos-v1) · [Before and after](#️-before-and-after-at-a-glance) · [The mission](#️-the-mission) · [How it works](#️-how-it-works) · [Running it](#-running-it) · [Repository layout](#-repository-layout) · [What I learned](#-what-i-learned) · [Future improvements](#-future-improvements) · [Contact](#-contact)
+
 ---
 
 ## 📺 Video demos (v1)
@@ -27,16 +29,18 @@ This repository holds **two versions side by side**:
 
 ## ⚖️ Before and after at a glance
 
+![Bar and line charts comparing v1 and v2: the jar scan turns 271 degrees in v1 (188 with wheel slip) and 371 in v2; a 530 cm leg started 2.9 degrees off ends 26.8 cm from the waypoint in v1 and 1.1 cm in v2; after a failed search v1 drives 41.4 m and v2 0.8 m](docs/images/before-after.svg)
+
 | | v1 (before) | v2 (after) |
 |---|---|---|
 | After a failed search for jars 2-5 | Drives a 17.8 m straight line through 4 immovable wooden boxes | Returns 0.8 m to the search point |
 | Robot blocked while driving | Pushes forever | Detects the stall in ~4 s and moves on |
-| "360°" jar scan | Covers ~271° (fixed 200 steps) | Covers 370°, measured by the compass |
-| Turn finishes (6,240 start/target pairs, kinematic model) | 91.8%. Can bounce across the ±3° window forever | 100% |
+| "360°" jar scan | Covers ~271° (fixed 200 steps); 188° with wheel slip | Covers 370°, measured by the compass, with or without slip |
+| Turn finishes (6,240 start/target pairs, kinematic model) | 91.8% at the ideal turn rate (can bounce across the ±3° window forever); 100% with slip | 100% in both |
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 51 JUnit tests, GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 59 JUnit tests, GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -151,7 +155,7 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 51 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and the map above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 59 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
@@ -175,7 +179,8 @@ tools/
   build-controllers.sh         compile both controllers so Webots can run them
   run-in-webots.sh             run v1 and v2 headless in Webots and compare them
   webots/                      observer supervisor used by run-in-webots.sh
-  BeforeAfterBenchmark.java    v1 vs v2 measurements
+  BeforeAfterBenchmark.java    v1 vs v2 measurements (ideal model, then with motor lag and wheel slip)
+  BeforeAfterFigure.java       draws docs/images/before-after.svg
   MapRenderer.java             draws docs/images/mission-map.svg
   WorldFile.java               reads obstacle footprints from the .wbt file
   fetch-protos.sh              how the protos were rebuilt from Webots R2021b

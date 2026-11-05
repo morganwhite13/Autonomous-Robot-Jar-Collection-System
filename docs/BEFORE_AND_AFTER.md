@@ -18,7 +18,7 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 
 **Done:**
 - Both controllers compile against the real Webots R2025a `Controller.jar`. CI compiles them against API stubs whose signatures were copied from that jar.
-- 51 JUnit tests. Most run v2's real navigation, search and mission classes on a kinematic model of the Pioneer 3-DX (wheel radius 9.75 cm, axle track 33 cm, 32 ms steps, synthetic 64x64 camera).
+- 59 JUnit tests. Most run v2's real navigation, search and mission classes on a kinematic model of the Pioneer 3-DX (wheel radius 9.75 cm, axle track 33 cm, 32 ms steps, synthetic 64x64 camera).
 - The v1 methods being compared were ported line for line into [`tests/LegacyV1.java`](../tests/LegacyV1.java) and measured on the same model ([`docs/benchmark-results.md`](benchmark-results.md)). [`LegacyBehaviourTest`](../tests/LegacyBehaviourTest.java) pins each v1 behaviour described here, so the claims fail loudly if they stop being true.
 - Route geometry was checked against the obstacles parsed from the `.wbt` file.
 
@@ -27,6 +27,8 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 ---
 
 ## Measured on the kinematic model
+
+![v1 vs v2 on the same robot model: scan coverage, drift on a 530 cm leg, and distance driven after a failed search](images/before-after.svg)
 
 | Check | v1 (before) | v2 (after) |
 |---|---|---|
@@ -41,7 +43,16 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 | Mission when no jar can be found | retries forever | stops after 3 failed searches with a report |
 | Whole mission | - | 5/5 jars, 815 s simulated, 0 stalls |
 
-The full generated table is in [`benchmark-results.md`](benchmark-results.md). Regenerate it with `tools/run-tests.sh`.
+**With motor lag and wheel slip.** The model is ideal, so the benchmark repeats the checks with every wheel command applied 64 ms late and turns reaching only 70% of their ideal rate. Neither version was tuned for these values.
+
+| Check | v1 (before) | v2 (after) |
+|---|---|---|
+| Turn-in-place finishes | 100% | 100% |
+| Rotation actually covered by the "360°" jar scan | **188°** | 371° |
+| 530 cm leg started 2.9° off: distance from the waypoint at the end | 26.8 cm | 0.6 cm |
+| Whole mission | - | 5/5 jars, 864 s simulated, 0 stalls |
+
+The full generated tables are in [`benchmark-results.md`](benchmark-results.md). Regenerate them with `tools/run-tests.sh`.
 
 ---
 
@@ -51,6 +62,42 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 **v1:** `main` picks the route to the search point with `if (jarsToGo == 5)` (line 130). Only jar 1 uses the short route. For jars 2-5 it uses `navigateFromDropoffToSearch()`, which assumes the robot is at the drop-off. After a failed search (lines 144-148) the robot is still at the search point, so the route's first leg (line 588) is a straight 17.8 m line from the jar bay to the drop-off. That line passes through four wooden boxes, which have no mass in the world file and so cannot be pushed. Combined with bug 3 below, the robot could push against one forever.
 
 **v2:** [`Mission`](../controllers/JarCollectorV2/Mission.java) tracks whether the robot is at the drop-off and takes the 0.8 m hop back to the search point after a failed search. It also drops v1's extra random move after a failed search (line 147): the robot drives straight back to the same search point anyway, so it only risked knocking a jar. Random moves inside a search (when a full scan sees nothing) are kept. The red dotted line on the [mission map](images/mission-map.svg) shows the old route.
+
+<details>
+<summary>Code: v1 vs v2</summary>
+
+v1 (`ProjectController3.java`, lines 129-148):
+```java
+// Go to search area
+if (jarsToGo == 5) {
+  navigateToSearchArea();
+} else {
+  navigateFromDropoffToSearch();   // assumes the robot is at the drop-off
+}
+boolean success = intelligentJarSearch(timeStep);
+if (success) {
+  ...
+} else {
+  System.out.println("CRITICAL: Failed to find jar after all attempts!");
+  moveRandomly(timeStep);          // then loops back to the "if" above
+}
+```
+
+v2 (`Mission.java`):
+```java
+List<Vec2> route = atDropoff ? Routes.DROPOFF_TO_SEARCH : Routes.TO_SEARCH_POINT;
+nav.followRoute(route);
+atDropoff = false;
+
+if (!jars.searchAndGrab()) {
+  stats.recordFailedSearch();
+  if (++failedInARow >= Config.MAX_CONSECUTIVE_FAILED_SEARCHES) {
+    break;                          // stop and print the mission report
+  }
+  continue;                         // still at the search point: short route next time
+}
+```
+</details>
 
 ### 2. Endless retries
 **v1:** `while (jarsToGo > 0)` (line 126) has no attempt limit, so a jar that cannot be found makes the program run forever.
@@ -62,7 +109,44 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 
 ### 4. Turns could bounce around the target heading
 **v1:** `makeHardcodedTurn` (lines 722-765) always turns at full speed, about 5.4° per 32 ms step, and stops only when the integer heading lands strictly inside `finalAngle ± 3` (line 748). That window is 5 values wide, so a step can jump over it, reverse, and jump back. On the model, 8.2% of start/target pairs never finished. An independent check with a different heading-only model ([PR #1](https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System/pull/1)) found about the same rate: 135 of 1,296 turns never settled. The check also doesn't wrap around 0/360: a target of 0° only accepts 0-2°, and 359° only accepts 357-359°. It also always turns for one step before checking, even when already aligned.
+
+How often this bites depends on how fast the robot really turns. When slip slows the turn to 70% of the ideal rate, each step is small enough to land in the window and all of v1's turns finish. So in Webots it may show up as occasional extra swinging rather than a hang. The wrap-around gap remains either way.
+
 **v2:** Uses a seam-safe heading error, full speed down to 30° from the target, then proportional slow-down. It checks before moving and has a timeout. It finished 100% of pairs, at about 0.2 s extra per turn.
+
+<details>
+<summary>Code: v1 vs v2</summary>
+
+v1 (`ProjectController3.java`, lines 746-760), always at full speed:
+```java
+while (robot.step(timeStep) != -1) {
+  int degrees = (getCompassReadingInDegrees(compass) + 360) % 360;
+  if (degrees > finalAngle - 3 && degrees < finalAngle + 3)   // not wrap-safe
+    break;
+  int distTurningRight = (degrees - finalAngle + 360) % 360;
+  int distTurningLeft = (finalAngle - degrees + 360) % 360;
+  if (distTurningRight < distTurningLeft) {
+    leftMotor.setVelocity(MAX_SPEED);  rightMotor.setVelocity(-MAX_SPEED);
+  } else {
+    leftMotor.setVelocity(-MAX_SPEED); rightMotor.setVelocity(MAX_SPEED);
+  }
+}
+```
+
+v2 (`Navigator.java`), check first, slow down near the target, give up eventually:
+```java
+for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
+  double error = Angles.delta(robot.headingDeg(), targetDeg);      // in (-180, 180]
+  if (Math.abs(error) <= Config.HEADING_TOLERANCE_DEG) {
+    robot.stop();
+    return true;
+  }
+  double speed = clamp(maxSpeed * Math.abs(error) / Config.TURN_SLOWDOWN_DEG, minSpeed, maxSpeed);
+  if (error > 0) robot.drive(-speed, speed); else robot.drive(speed, -speed);
+  robot.step();
+}
+```
+</details>
 
 ### 5. Straight legs drifted off line
 **v1:** Drives open-loop. A turn that ends 2.9° off (allowed by the ±3° tolerance) puts the robot 26.8 cm from the waypoint at the end of the 530 cm leg. Box pushing adds more error.
@@ -70,7 +154,7 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 
 ### 6. The "360°" scan covered about 270°
 **v1:** `rotateAndFindGreen` rotates for a fixed 200 steps at `MAX_SPEED / 4` (lines 206-212). With the Pioneer's wheel geometry and the default 32 ms step that is about 271°. Since the robot always turns left, a jar slightly right of the starting heading is never in view.
-**v2:** Adds up the compass heading changes and stops after 370°.
+**v2:** Adds up the compass heading changes and stops after 370°. This also makes it independent of how fast the robot actually turns: with 30% wheel slip, v1's fixed 200 steps cover only 188°, while v2 still covers a full turn.
 
 ### 7. Approaches were cut off after about 58 cm
 **v1:** The approach loop has two limits: `maxApproachSteps = 400` (line 277) and `approachSteps > 300` (line 370). The 300 check always triggers first, so 400 is dead code. 300 steps at `MAX_SPEED / 8` is about 58 cm of travel. The jars start 50-162 cm from the search point and the bumper touches at about 25 cm, so for 4 of the 5 starting jar positions the first approach would stop with "Approach taking too long, probably hitting wall!". The robot then backs up and scans again.
@@ -99,7 +183,7 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 | Stale compiled controller | `ProjectController3.class` was committed. It was compiled from an older version of the source: it contains `findJar()`, `toStart()` and `hardcodedPath()`, which don't exist in the `.java`. Webots never compiles Java controllers by itself; it runs the `.class` it finds. So anyone who opened the repository ran that old code, not the source. | Deleted (still in git history) and `*.class` ignored. Build from source with `tools/build-controllers.sh` or Webots' Build button (the README now says so). |
 | Not a Webots project | Flat files. Webots looks for `controllers/<name>/` next to `worlds/`, and the world loads `../protos/*.proto`. | Standard `worlds/` + `controllers/` + `protos/` layout. |
 | Missing robot protos | The world needs `Pioneer3dx.proto` and `Pioneer3Gripper.proto`, which were never committed, so nobody else could open it. | Included in `protos/`, reconstructed from Webots R2021b. Every node type and field is checked statically against R2025a; not yet loaded in Webots. See [`protos/README.md`](../protos/README.md). |
-| No tests or CI | none | 51 JUnit tests and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and map are up to date. |
+| No tests or CI | none | 59 JUnit tests and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and figures are up to date. |
 
 ---
 
@@ -114,7 +198,7 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 | Duplicate code | Camera-to-array copy twice (lines 217-228, 300-311); position read 7 times | One `captureImage()`, one `positionCm()` |
 | Dead code | `WORLD_WIDTH`/`WORLD_HEIGHT`, blue-pixel counting, `GreenDetection.greenLeft/Center/Right`, `moveHardcodedAhead`'s always-`false` return, the 400-step limit | Removed |
 | Telemetry | Progress messages without times | Every log line has the simulated time, and each run ends with a mission report: time per phase, per-jar scans and approaches, stalls, timeouts |
-| Tests | 0 | 51 |
+| Tests | 0 | 59 |
 
 ---
 
