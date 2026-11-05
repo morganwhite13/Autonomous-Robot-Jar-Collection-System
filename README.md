@@ -36,6 +36,7 @@ This repository holds **two versions side by side**:
 
 | | v1 (before) | v2 (after) |
 |---|---|---|
+| Whole mission on the robot model | Never finishes. Stuck turning on the box-clearing route (0/5 jars); with motor lag and wheel slip, delivers 2/5 then pushes against a wooden box forever | 5/5 jars in 815 s (864 s with lag and slip) |
 | After a failed search for jars 2-5 | Drives a 17.8 m straight line through 4 immovable wooden boxes | Returns 0.8 m to the search point |
 | Robot blocked while driving | Pushes forever | Detects the stall in ~4 s and moves on |
 | "360°" jar scan | Covers ~271° (fixed 200 steps); 188° with wheel slip | Covers 370°, measured by the compass, with or without slip |
@@ -43,7 +44,7 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 114 JUnit tests covering 99% of v2's logic and catching 95% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 117 JUnit tests covering 99% of v2's logic and catching 95% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -207,7 +208,7 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 114 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 117 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh

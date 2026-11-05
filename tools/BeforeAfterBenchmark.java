@@ -58,16 +58,53 @@ public class BeforeAfterBenchmark {
   }
 
   private static void imperfectMission(StringBuilder md, WorldFile world) {
-    KinematicRobot robot = robot(world.robotStart, 90);
-    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
-      robot.jars.add(jar.center);
-    }
+    KinematicRobot robot = missionRobot(world);
     Mission mission = new Mission(robot);
     int delivered = mission.run();
     MissionStats s = mission.stats();
-    row(md, "Whole mission in the model (no box physics)", "not ported",
+    row(md, MISSION_ROW, v1Mission(world),
         delivered + "/5 jars, " + f0(robot.elapsedMs() / 1000.0) + " s simulated, "
             + s.driveStalls() + " stalls, " + s.turnTimeouts() + " turn timeouts");
+    md.append("\nWith lag and slip, v1's turns do finish, but each one overshoots: the motors keep ")
+        .append("turning for the lag after v1 stops them. v1 drives every leg without steering, so ")
+        .append("the error adds up from leg to leg. On the third return trip it is far enough off ")
+        .append("its route to drive into an immovable box, and with no stall detection it pushes ")
+        .append("against it until the simulation ends. v2 steers on every leg and gives up on a ")
+        .append("blocked leg after a few seconds.\n");
+  }
+
+  static final String MISSION_ROW =
+      "Whole mission (walls and wooden boxes are solid; no box physics)";
+  /** Close to the Pioneer's half-width: touching a wall or wooden box blocks the robot. */
+  static final double ROBOT_RADIUS_CM = 15;
+  /** v1's whole mission is stopped after this many steps (3,200 s, about 4x v2's mission). */
+  static final int V1_MISSION_STEP_LIMIT = 100_000;
+
+  /** The world's start pose (facing +y), the five jars, and solid walls and wooden boxes. */
+  static KinematicRobot missionRobot(WorldFile world) {
+    KinematicRobot robot = robot(world.robotStart, 90).withStaticObstacles(world, ROBOT_RADIUS_CM);
+    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
+      robot.jars.add(jar.center);
+    }
+    return robot;
+  }
+
+  /** Runs the port of v1's whole mission and describes how it went. */
+  static String v1Mission(WorldFile world) {
+    KinematicRobot robot = missionRobot(world).withStepLimit(V1_MISSION_STEP_LIMIT);
+    LegacyV1Mission.Result r = new LegacyV1Mission(robot, 1).run();
+    if (r.finished) {
+      return r.delivered + "/5 jars, " + f0(r.elapsedMs / 1000.0) + " s simulated";
+    }
+    String against = "";
+    for (WorldFile.Obstacle o : world.staticObstacles()) {
+      if (RoutePlanner.distanceToPolygon(robot.positionCm(), o.corners) < ROBOT_RADIUS_CM + 1) {
+        against = ", blocked by " + o.name;
+      }
+    }
+    return r.delivered + "/5 jars, never finishes: stuck from " + f0(r.activitySinceMs / 1000.0)
+        + " s " + r.activity + against + ", still at it when stopped at "
+        + f0(r.elapsedMs / 1000.0) + " s";
   }
 
   /** Every (start, target) heading pair on a grid; does the turn finish, and how fast? */
@@ -182,21 +219,15 @@ public class BeforeAfterBenchmark {
   }
 
   private static void mission(StringBuilder md, WorldFile world) {
-    KinematicRobot robot = robot(world.robotStart, 90); // facing +y, as in the world
-    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
-      robot.jars.add(jar.center);
-    }
+    KinematicRobot robot = missionRobot(world);
     Mission mission = new Mission(robot);
     int delivered = mission.run();
     MissionStats s = mission.stats();
-    row(md, "Whole mission in the model (no box physics)", "not ported (see note)",
+    row(md, MISSION_ROW, v1Mission(world),
         delivered + "/5 jars, " + f0(robot.elapsedMs() / 1000.0) + " s simulated, "
             + s.driveStalls() + " stalls, " + s.turnTimeouts() + " turn timeouts");
 
-    KinematicRobot plannedRobot = robot(world.robotStart, 90);
-    for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
-      plannedRobot.jars.add(jar.center);
-    }
+    KinematicRobot plannedRobot = missionRobot(world);
     int plannedDelivered = new Mission(plannedRobot, Routes.PLANNED).run();
     row(md, "Whole mission with v2's opt-in A*-planned routes (`Config.USE_PLANNED_ROUTES`)", "-",
         plannedDelivered + "/5 jars, " + f0(plannedRobot.elapsedMs() / 1000.0) + " s simulated");
@@ -206,8 +237,14 @@ public class BeforeAfterBenchmark {
     String v2 = "ends after " + noJars.run() + " jars, " + f0(empty.elapsedMs() / 1000.0) + " s";
     row(md, "Mission when no jar can be found",
         "retries forever (by inspection: `while (jarsToGo > 0)` has no attempt limit)", v2);
-    md.append("\nNote: the whole v1 mission is not ported; only the methods measured above are. ")
-        .append("v1 and v2 share the same waypoints and gripper timings (checked by `RoutesTest`).\n");
+    md.append("\nThe whole-mission rows run a line-for-line port of v1's `main` loop ")
+        .append("(`tests/LegacyV1Mission.java`) and the real v2 classes from the world's start pose, ")
+        .append("with the same waypoints and gripper timings (checked by `RoutesTest`). ")
+        .append("On the ideal model v1 never gets past the box-clearing route. The 5th leg heads ")
+        .append("for 0 deg, and v1 accepts a heading only if its compass reading (0-359) is within 3 deg ")
+        .append("of the target without wrapping, so near 0 deg only 0, 1 and 2 count. At full speed ")
+        .append("the robot turns about 5.4 deg per step, so it keeps stepping over that window. v2 ")
+        .append("compares headings across the 0/360 seam and slows down near the target.\n");
   }
 
   private static JarHandler handler(KinematicRobot robot) {

@@ -51,6 +51,11 @@ final class KinematicRobot implements RobotPlatform {
   Vec2 heldJar;
   double fingers = Config.FINGERS_OPEN;
   double lift = Config.LIFT_DOWN;
+  /**
+   * Gripper positions within this of a target count as reaching it. v1 passes float literals
+   * (0.099f, -0.0499f), which reach Webots as doubles a few 1e-9 away from v2's values.
+   */
+  static final double GRIPPER_TOLERANCE = 1e-6;
   /** Positions the robot centre may not enter (e.g. a wall for stall tests). */
   Predicate<Vec2> blocked = p -> false;
 
@@ -219,7 +224,7 @@ final class KinematicRobot implements RobotPlatform {
   @Override
   public void setFingers(double position) {
     fingers = position;
-    if (position >= Config.FINGERS_OPEN && heldJar != null) {
+    if (position >= Config.FINGERS_OPEN - GRIPPER_TOLERANCE && heldJar != null) {
       // Release in front of the robot.
       double h = Math.toRadians(heading);
       deliveredJars.add(Vec2.of(x + TOUCH_DISTANCE_CM * Math.cos(h), y + TOUCH_DISTANCE_CM * Math.sin(h)));
@@ -230,7 +235,8 @@ final class KinematicRobot implements RobotPlatform {
   @Override
   public void setLift(double position) {
     lift = position;
-    if (position <= Config.LIFT_UP && fingers <= Config.FINGERS_CLOSED && heldJar == null) {
+    if (position <= Config.LIFT_UP + GRIPPER_TOLERANCE
+        && fingers <= Config.FINGERS_CLOSED + GRIPPER_TOLERANCE && heldJar == null) {
       heldJar = touchedJar();
       jars.remove(heldJar);
     }
