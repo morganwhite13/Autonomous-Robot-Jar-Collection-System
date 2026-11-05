@@ -5,4 +5,5 @@ package com.cyberbotics.webots.controller;
 // methods return neutral values so static analysis sees the same flow as with the real API.
 public class Node {
   public Field getField(String fieldName) { return new Field(); }
+  public double[] getOrientation() { return new double[] {1, 0, 0, 0, 1, 0, 0, 0, 1}; }
 }

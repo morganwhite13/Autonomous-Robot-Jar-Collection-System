@@ -168,6 +168,8 @@ final class Config {
   static final double SONAR_SLOW_CM = 100;
   /** new: stop and skip to the next waypoint when an echo is this close. */
   static final double SONAR_STOP_CM = 25;
+  /** The front sonars (so3, so4) sit this far ahead of the robot's centre (Pioneer3dx proto). */
+  static final double FRONT_SONAR_AHEAD_CM = 16.4;
   /** new: slowest speed while slowing down, as a fraction of MAX_SPEED. */
   static final double SONAR_MIN_SPEED_FRACTION = 0.2;
 
