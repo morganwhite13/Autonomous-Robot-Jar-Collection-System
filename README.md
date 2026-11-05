@@ -38,7 +38,7 @@ This repository holds **two versions side by side**:
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
 | Tests / CI | none | 46 JUnit tests, GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
-| Repo opens in Webots | No: flat layout, missing protos, stale `.class` built from older code | Standard Webots project layout; missing protos documented |
+| Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
 The numbers come from running ports of v1's methods and the real v2 classes on the same kinematic model of the robot. **Neither version has been re-run in Webots since the rewrite**; see [how it was checked](docs/BEFORE_AND_AFTER.md#how-this-was-checked-and-what-still-needs-checking).
 
@@ -130,15 +130,15 @@ Anomalies: drive stalls=0, drive timeouts=0, turn timeouts=0, failed searches=0
 ### Prerequisites
 - **[Webots R2025a](https://cyberbotics.com/)**
 - **JDK 11 or newer** on your `PATH` (Webots compiles Java controllers itself)
-- **The robot protos.** The world loads `protos/Pioneer3dx.proto` and `protos/Pioneer3Gripper.proto`, which aren't in the repository. See [`protos/README.md`](protos/README.md): copy in your originals, or try `tools/fetch-protos.sh` (untested).
+
+The robot protos the world needs are included in `protos/`. They are reconstructed from Webots R2021b and checked statically against R2025a, but haven't been loaded in Webots yet. If the robot doesn't appear, see [`protos/README.md`](protos/README.md).
 
 ### In Webots
 1. `git clone https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System.git`
-2. Add the protos (above).
-3. **File → Open World** and choose:
+2. **File → Open World** and choose:
    - `worlds/ProjectWorld2025.wbt` for **v1**, or
    - `worlds/ProjectWorld2025_v2.wbt` for **v2** (same world, different controller).
-4. Press ▶. The console shows progress; v2 prefixes every line with the simulated time and ends with the mission report.
+3. Press ▶. The console shows progress; v2 prefixes every line with the simulated time and ends with the mission report.
 
 ### Tests (no Webots needed)
 ```bash
@@ -161,14 +161,14 @@ worlds/
 controllers/
   ProjectController3/          v1 controller (unchanged)
   JarCollectorV2/              v2 controller
-protos/                        robot protos go here (see README inside)
+protos/                        Pioneer 3-DX robot protos (reconstructed; see README inside)
 tests/                         JUnit tests, kinematic robot model, ports of v1 methods
 tools/
   run-tests.sh                 build + test + regenerate docs
   BeforeAfterBenchmark.java    v1 vs v2 measurements
   MapRenderer.java             draws docs/images/mission-map.svg
   WorldFile.java               reads obstacle footprints from the .wbt file
-  fetch-protos.sh              rebuilds the robot protos from Webots R2021b (untested)
+  fetch-protos.sh              how the protos were rebuilt from Webots R2021b
   webots-stubs/                compile-only Webots API stubs for CI
 docs/
   BEFORE_AND_AFTER.md          the full comparison
@@ -223,7 +223,7 @@ docs/
 
 ### Next, following on from v2
 1. Run both versions in Webots and put v2's mission report next to v1's run time
-2. Commit the robot protos so the repository runs as cloned
+2. Confirm the reconstructed robot protos load in Webots (or swap in the originals)
 3. Use the front sonars to detect obstacles, instead of only noticing a stall afterwards
 4. A real grab check, calibrated from the "camera now sees N green px" line v2 logs after each lift
 

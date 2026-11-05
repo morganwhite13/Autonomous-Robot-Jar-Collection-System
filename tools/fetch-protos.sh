@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# UNTESTED helper: downloads the Webots R2021b (NUE) Pioneer 3-DX protos into protos/ and
-# updates their headers so Webots R2025a can load them. See protos/README.md for why these files
-# are needed and why they are not committed. Prefer copying your original protos if you have them.
+# Shows how the committed protos/*.proto files were made: download the Webots R2021b (NUE)
+# Pioneer 3-DX protos and update their headers for Webots R2025a. Existing files are left alone,
+# so delete protos/*.proto first to regenerate them. See protos/README.md.
 set -euo pipefail
 cd "$(dirname "$0")/../protos"
 

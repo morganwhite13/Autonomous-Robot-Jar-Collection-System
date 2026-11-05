@@ -22,7 +22,7 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 - The v1 methods being compared were ported line for line into [`tests/LegacyV1.java`](../tests/LegacyV1.java) and measured on the same model ([`docs/benchmark-results.md`](benchmark-results.md)). [`LegacyBehaviourTest`](../tests/LegacyBehaviourTest.java) pins each v1 behaviour described here, so the claims fail loudly if they stop being true.
 - Route geometry was checked against the obstacles parsed from the `.wbt` file.
 
-**Not done yet:** neither version has been run in Webots as part of this change. Webots could not be launched in the environment this was written in, and the robot protos are not in the repository (see [`protos/README.md`](../protos/README.md)). The kinematic model has no inertia, wheel slip or box physics. Running both worlds in Webots and comparing v2's end-of-run mission report with v1's run time is the next step. Every behaviour change can be switched back to v1's behaviour in [`Config.java`](../controllers/JarCollectorV2/Config.java) (see the last section).
+**Not done yet:** neither version has been run in Webots as part of this change. Webots could not be launched in the environment this was written in. The robot protos are now included, reconstructed from Webots R2021b and checked statically against R2025a, but they haven't been loaded in Webots either (see [`protos/README.md`](../protos/README.md)). The kinematic model has no inertia, wheel slip or box physics. Running both worlds in Webots and comparing v2's end-of-run mission report with v1's run time is the next step. Every behaviour change can be switched back to v1's behaviour in [`Config.java`](../controllers/JarCollectorV2/Config.java) (see the last section).
 
 ---
 
@@ -98,7 +98,7 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 |---|---|---|
 | Stale compiled controller | `ProjectController3.class` was committed. It was compiled from an older version of the source: it contains `findJar()`, `toStart()` and `hardcodedPath()`, which don't exist in the `.java`. Depending on file timestamps, Webots could run that old code instead of the source. | Deleted (still in git history) and `*.class` ignored. Webots compiles controllers from source. |
 | Not a Webots project | Flat files. Webots looks for `controllers/<name>/` next to `worlds/`, and the world loads `../protos/*.proto`. | Standard `worlds/` + `controllers/` + `protos/` layout. |
-| Missing robot protos | The world needs `Pioneer3dx.proto` and `Pioneer3Gripper.proto`, which were never committed, so nobody else could open it. | Documented in [`protos/README.md`](../protos/README.md), with an (untested) script that rebuilds them from Webots R2021b. They are still not committed. |
+| Missing robot protos | The world needs `Pioneer3dx.proto` and `Pioneer3Gripper.proto`, which were never committed, so nobody else could open it. | Included in `protos/`, reconstructed from Webots R2021b. Every node type and field is checked statically against R2025a; not yet loaded in Webots. See [`protos/README.md`](../protos/README.md). |
 | No tests or CI | none | 46 JUnit tests and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and map are up to date. |
 
 ---
