@@ -148,7 +148,7 @@ public class BeforeAfterBenchmark {
   }
 
   private static void mission(StringBuilder md, WorldFile world) {
-    KinematicRobot robot = new KinematicRobot(world.robotStart, 0);
+    KinematicRobot robot = new KinematicRobot(world.robotStart, 90); // facing +y, as in the world
     for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
       robot.jars.add(jar.center);
     }

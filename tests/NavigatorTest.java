@@ -62,7 +62,7 @@ class NavigatorTest {
 
   @Test
   void everyRouteReachesEveryWaypointInOpenSpace() {
-    checkRoute(Vec2.of(-815.65, 556.873), 0, Routes.CLEARING_PATH);
+    checkRoute(Vec2.of(-815.65, 556.873), 90, Routes.CLEARING_PATH);
     checkRoute(Routes.SEARCH_POINT, 270, Routes.TO_SEARCH_POINT);
     checkRoute(Routes.SEARCH_POINT, 120, Routes.SEARCH_TO_DROPOFF);
     checkRoute(Vec2.of(-900, 637), 0, Routes.DROPOFF_TO_SEARCH);

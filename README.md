@@ -107,11 +107,11 @@ At the end of every run v2 prints a report like this one (this example is from t
 
 ```
 ==================== MISSION REPORT (v2) ====================
-Result: 5/5 jars delivered in 815.2 s of simulated time
+Result: 5/5 jars delivered in 814.9 s of simulated time
 
 Time by phase (summed over all jars)
   Start-up                      1.3 s
-  Clearing path                89.4 s
+  Clearing path                89.1 s
   Travel to search point      234.8 s
   Search and grab             168.7 s
   Carry to drop-off           284.4 s
@@ -129,16 +129,17 @@ Anomalies: drive stalls=0, drive timeouts=0, turn timeouts=0, failed searches=0
 
 ### Prerequisites
 - **[Webots R2025a](https://cyberbotics.com/)**
-- **JDK 11 or newer** on your `PATH` (Webots compiles Java controllers itself)
+- **JDK 11 or newer** on your `PATH`
 
 The robot protos the world needs are included in `protos/`. They are reconstructed from Webots R2021b and checked statically against R2025a, but haven't been loaded in Webots yet. If the robot doesn't appear, see [`protos/README.md`](protos/README.md).
 
 ### In Webots
 1. `git clone https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System.git`
-2. **File → Open World** and choose:
+2. **Build the controllers.** Webots doesn't compile Java controllers on its own; with only the `.java` files it reports "Could not find controller file". Either run `WEBOTS_HOME=/usr/local/webots tools/build-controllers.sh` (macOS: `WEBOTS_HOME=/Applications/Webots.app`), or open each controller's main file in Webots' text editor and press **Build**.
+3. **File → Open World** and choose:
    - `worlds/ProjectWorld2025.wbt` for **v1**, or
    - `worlds/ProjectWorld2025_v2.wbt` for **v2** (same world, different controller).
-3. Press ▶. The console shows progress; v2 prefixes every line with the simulated time and ends with the mission report.
+4. Press ▶. The console shows progress; v2 prefixes every line with the simulated time and ends with the mission report.
 
 ### Compare v1 and v2 in Webots automatically
 ```bash
@@ -171,6 +172,7 @@ protos/                        Pioneer 3-DX robot protos (reconstructed; see REA
 tests/                         JUnit tests, kinematic robot model, ports of v1 methods
 tools/
   run-tests.sh                 build + test + regenerate docs
+  build-controllers.sh         compile both controllers so Webots can run them
   run-in-webots.sh             run v1 and v2 headless in Webots and compare them
   webots/                      observer supervisor used by run-in-webots.sh
   BeforeAfterBenchmark.java    v1 vs v2 measurements

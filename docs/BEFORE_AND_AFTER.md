@@ -50,7 +50,7 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 ### 1. A failed search sent the robot straight across the arena (serious)
 **v1:** `main` picks the route to the search point with `if (jarsToGo == 5)` (line 130). Only jar 1 uses the short route. For jars 2-5 it uses `navigateFromDropoffToSearch()`, which assumes the robot is at the drop-off. After a failed search (lines 144-148) the robot is still at the search point, so the route's first leg (line 588) is a straight 17.8 m line from the jar bay to the drop-off. That line passes through four wooden boxes, which have no mass in the world file and so cannot be pushed. Combined with bug 3 below, the robot could push against one forever.
 
-**v2:** [`Mission`](../controllers/JarCollectorV2/Mission.java) tracks whether the robot is at the drop-off and takes the 0.8 m hop back to the search point after a failed search. The red dotted line on the [mission map](images/mission-map.svg) shows the old route.
+**v2:** [`Mission`](../controllers/JarCollectorV2/Mission.java) tracks whether the robot is at the drop-off and takes the 0.8 m hop back to the search point after a failed search. It also drops v1's extra random move after a failed search (line 147): the robot drives straight back to the same search point anyway, so it only risked knocking a jar. Random moves inside a search (when a full scan sees nothing) are kept. The red dotted line on the [mission map](images/mission-map.svg) shows the old route.
 
 ### 2. Endless retries
 **v1:** `while (jarsToGo > 0)` (line 126) has no attempt limit, so a jar that cannot be found makes the program run forever.
@@ -82,7 +82,7 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 
 ### 9. Dark grey and brown pixels counted as jar green
 **v1:** A pixel is "green" if `R < 120 && G > 35 && B < 120` (line 543). That includes grey (50, 50, 50) and brown (100, 80, 60), so shadows and dark surfaces add to the count.
-**v2:** Keeps those thresholds and also requires green to beat red and blue by 10. `VisionTest` checks that v2 accepts only pixels v1 also accepted, and still accepts shaded and washed-out jar colours.
+**v2:** Keeps those thresholds and also requires green to beat red and blue by 10. `VisionTest` checks that v2 accepts only pixels v1 also accepted, and still accepts shaded and washed-out jar colours. v1's pixel-count thresholds (20, 15, 30) were tuned on v1's counts, so during approaches v2 logs both counts ("v1 rule: N px"). The first Webots run will show whether the stricter test ever loses a jar that v1 would still see.
 
 ### 10. Smaller fixes
 - **Bumper ignored while pausing:** during the 5-step "reassess" pause (lines 357-367) v1 did not read the touch sensor. v2 does.
@@ -96,7 +96,7 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 
 | Problem | Before | After |
 |---|---|---|
-| Stale compiled controller | `ProjectController3.class` was committed. It was compiled from an older version of the source: it contains `findJar()`, `toStart()` and `hardcodedPath()`, which don't exist in the `.java`. Depending on file timestamps, Webots could run that old code instead of the source. | Deleted (still in git history) and `*.class` ignored. Webots compiles controllers from source. |
+| Stale compiled controller | `ProjectController3.class` was committed. It was compiled from an older version of the source: it contains `findJar()`, `toStart()` and `hardcodedPath()`, which don't exist in the `.java`. Webots never compiles Java controllers by itself; it runs the `.class` it finds. So anyone who opened the repository ran that old code, not the source. | Deleted (still in git history) and `*.class` ignored. Build from source with `tools/build-controllers.sh` or Webots' Build button (the README now says so). |
 | Not a Webots project | Flat files. Webots looks for `controllers/<name>/` next to `worlds/`, and the world loads `../protos/*.proto`. | Standard `worlds/` + `controllers/` + `protos/` layout. |
 | Missing robot protos | The world needs `Pioneer3dx.proto` and `Pioneer3Gripper.proto`, which were never committed, so nobody else could open it. | Included in `protos/`, reconstructed from Webots R2021b. Every node type and field is checked statically against R2025a; not yet loaded in Webots. See [`protos/README.md`](../protos/README.md). |
 | No tests or CI | none | 51 JUnit tests and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and map are up to date. |

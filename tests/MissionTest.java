@@ -20,7 +20,9 @@ class MissionTest {
   }
 
   private static KinematicRobot robotWithJars() {
-    KinematicRobot robot = new KinematicRobot(world.robotStart, 0);
+    // Facing +y (90 deg): the robot's rotation in the world file is the identity, and the
+    // Pioneer's forward axis is -Z, which is +y in the controllers' frame.
+    KinematicRobot robot = new KinematicRobot(world.robotStart, 90);
     for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {
       robot.jars.add(jar.center);
     }
@@ -56,7 +58,7 @@ class MissionTest {
 
   @Test
   void stopsAfterRepeatedFailedSearchesInsteadOfLoopingForever() {
-    KinematicRobot robot = new KinematicRobot(world.robotStart, 0).withStepLimit(1_000_000);
+    KinematicRobot robot = new KinematicRobot(world.robotStart, 90).withStepLimit(1_000_000);
     Mission mission = new Mission(robot);
     assertEquals(0, mission.run());
     assertEquals(Config.MAX_CONSECUTIVE_FAILED_SEARCHES, mission.stats().failedSearches);

@@ -111,11 +111,12 @@ final class JarHandler {
         return grab();
       }
 
-      Vision.SectorCounts counts = Vision.countGreen(robot.captureImage());
+      RgbImage image = robot.captureImage();
+      Vision.SectorCounts counts = Vision.countGreen(image);
       if (counts.total() < Config.APPROACH_LOST_PIXELS) {
         if (++stepsWithoutJar > Config.APPROACH_MAX_STEPS_WITHOUT_JAR) {
           robot.stop();
-          Log.info("Lost sight of the jar; aborting approach");
+          Log.info("Lost sight of the jar; aborting approach (" + v1Count(image) + ")");
           return false;
         }
       } else {
@@ -123,7 +124,8 @@ final class JarHandler {
       }
 
       if (step % 20 == 0) {
-        Log.info("  approach step " + step + ": " + counts.total() + " px " + counts);
+        Log.info("  approach step " + step + ": " + counts.total() + " px " + counts
+            + " (" + v1Count(image) + ")");
       }
 
       switch (Vision.steer(counts)) {
@@ -159,6 +161,16 @@ final class JarHandler {
     robot.stop();
     Log.info("Approach timed out");
     return false;
+  }
+
+  /**
+   * Diagnostic for the first Webots runs: what v1's looser green test would count in the same
+   * frame. v2's pixel thresholds were tuned on v1's counts; if approaches end with "Lost sight"
+   * a few cm short of the jar while this number stays high, set GREEN_DOMINANCE_MARGIN to
+   * Vision.V1_COMPATIBLE_MARGIN.
+   */
+  private static String v1Count(RgbImage image) {
+    return "v1 rule: " + Vision.countGreen(image, Vision.V1_COMPATIBLE_MARGIN).total() + " px";
   }
 
   /** v1 executeGrab: same positions and timings. */
