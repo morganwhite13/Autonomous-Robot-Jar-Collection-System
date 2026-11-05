@@ -61,7 +61,7 @@ The full generated table is in [`benchmark-results.md`](benchmark-results.md). R
 **v2:** [`Navigator.driveTo`](../controllers/JarCollectorV2/Navigator.java) checks progress every 40 steps. If the robot moved less than 2 cm, it reports a stall and continues with the next waypoint. Each drive also has a hard timeout. Both are counted in the mission report.
 
 ### 4. Turns could bounce around the target heading
-**v1:** `makeHardcodedTurn` (lines 722-765) always turns at full speed, about 5.4° per 32 ms step, and stops only when the integer heading lands strictly inside `finalAngle ± 3` (line 748). That window is 5 values wide, so a step can jump over it, reverse, and jump back. On the model, 8.2% of start/target pairs never finished. The check also doesn't wrap around 0/360: a target of 0° only accepts 0-2°, and 359° only accepts 357-359°. It also always turns for one step before checking, even when already aligned.
+**v1:** `makeHardcodedTurn` (lines 722-765) always turns at full speed, about 5.4° per 32 ms step, and stops only when the integer heading lands strictly inside `finalAngle ± 3` (line 748). That window is 5 values wide, so a step can jump over it, reverse, and jump back. On the model, 8.2% of start/target pairs never finished. An independent check with a different heading-only model ([PR #1](https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System/pull/1)) found about the same rate: 135 of 1,296 turns never settled. The check also doesn't wrap around 0/360: a target of 0° only accepts 0-2°, and 359° only accepts 357-359°. It also always turns for one step before checking, even when already aligned.
 **v2:** Uses a seam-safe heading error, full speed down to 30° from the target, then proportional slow-down. It checks before moving and has a timeout. It finished 100% of pairs, at about 0.2 s extra per turn.
 
 ### 5. Straight legs drifted off line
@@ -124,6 +124,7 @@ The original README is kept unchanged in [`v1-original-README.md`](v1-original-R
 
 | Original README | The v1 code |
 |---|---|
+| "Operate without GPS, pre-mapped routes, or external guidance systems" | The controller is a Webots Supervisor that reads the robot's exact position from the simulator (`getSelf().getField("translation")`) and follows hand-tuned waypoint routes. Only jar detection relies on the onboard camera and touch sensor |
 | Distance sensors "prevent collisions throughout mission" | They're enabled and printed during a start-up debug test (lines 110-119), then never read again |
 | Accelerometer for "stability monitoring" | It's in the world file but never enabled or read |
 | Blue detection "used for navigation guidance during return phase" | Blue pixels are counted (line 544) but the result is never used |
