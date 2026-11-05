@@ -433,4 +433,63 @@ class JarHandlerTest {
     assertTrue(handler.searchAndGrab());
     assertEquals(1, handler.rememberedJars().size());
   }
+
+  /** A scripted robot whose finger force follows a list of readings, then stays at the last. */
+  private static ScriptedRobot withGripEfforts(double... readings) {
+    return new ScriptedRobot() {
+      private int next;
+
+      @Override
+      public double gripEffort() {
+        return readings[Math.min(next++, readings.length - 1)];
+      }
+    };
+  }
+
+  @Test
+  void gripWatchNeedsALongRunOfLowReadingsAndRemembersTheLowest() {
+    int confirm = Config.DROP_CONFIRM_STEPS;
+    double[] readings = new double[1 + (confirm - 1) + 1 + 1 + confirm];
+    int i = 0;
+    readings[i++] = 1.0;
+    for (int k = 0; k < confirm - 1; k++) {
+      readings[i++] = 0.2; // a dip one reading too short to count
+    }
+    readings[i++] = 0.9; // the grip recovers
+    readings[i++] = Double.NaN; // can't tell: counts as holding
+    for (int k = 0; k < confirm; k++) {
+      readings[i++] = 0.1; // gone for good
+    }
+    ScriptedRobot robot = withGripEfforts(readings);
+    JarHandler.GripWatch watch = handler(robot).gripWatch();
+    assertTrue(Double.isNaN(watch.lowest()));
+    for (int k = 0; k < readings.length - 1; k++) {
+      assertTrue(watch.getAsBoolean(), "reading " + k);
+    }
+    assertFalse(watch.getAsBoolean(), "the last of " + confirm + " low readings in a row");
+    assertEquals(0.1, watch.lowest(), 1e-12);
+  }
+
+  @Test
+  void aScanThatLeadsToAGrabForgetsTheGrabbedJar() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    robot.jars.add(Vec2.of(120, 0));
+    robot.jars.add(Vec2.of(0, 140));
+    JarHandler handler = handler(robot);
+    assertTrue(handler.searchAndGrab()); // nothing remembered yet: scans, then grabs one
+    assertEquals(1, handler.rememberedJars().size());
+    Vec2 left = handler.rememberedJars().get(0);
+    assertTrue(left.distanceTo(robot.jars.get(0)) < 15, left + " vs " + robot.jars);
+  }
+
+  @Test
+  void aPlacementAbandonedOnTheWayLetsGoWithoutBackingOut() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(-850, 607), 180);
+    robot.setFingers(Config.FINGERS_CLOSED);
+    assertFalse(handler(robot).place(0, () -> false));
+    assertEquals(Config.FINGERS_OPEN, robot.fingers);
+    assertEquals(Config.LIFT_DOWN, robot.lift);
+    assertTrue(robot.isStopped());
+    assertTrue(robot.positionCm().distanceTo(Vec2.of(-850, 607)) < 1e-9, "moved: " + robot.positionCm());
+  }
 }

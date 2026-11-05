@@ -333,4 +333,46 @@ class NavigatorTest {
     assertEquals(1, stats.detours());
     assertTrue(Double.isNaN(robot.firstContactSpeedCmS), "touched the box");
   }
+
+  @Test
+  void theAssumedObstacleIsASquareCentredAheadOfTheRobot() {
+    Vec2[] north = Navigator.squareAhead(Vec2.of(100, 50), 90, 35, 40);
+    assertArrayEquals(new Vec2[] {Vec2.of(80, 65), Vec2.of(120, 65), Vec2.of(120, 105),
+        Vec2.of(80, 105)}, north);
+    Vec2[] east = Navigator.squareAhead(Vec2.of(0, 0), 0, 50, 20);
+    assertTrue(east[0].distanceTo(Vec2.of(40, -10)) < 1e-9 && east[2].distanceTo(Vec2.of(60, 10)) < 1e-9,
+        java.util.Arrays.toString(east));
+  }
+
+  @Test
+  void aRouteIsAbandonedMidTurnWhenItsConditionFails() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    int[] checks = {0};
+    assertEquals(Navigator.DriveResult.ABORTED, nav(robot).goTo(Vec2.of(-300, 0),
+        new Navigator.Travel().keepGoingWhile(() -> ++checks[0] < 5)));
+    assertTrue(robot.isStopped());
+    assertTrue(Math.abs(robot.cumulativeTurnDeg) > 1 && Math.abs(robot.cumulativeTurnDeg) < 90,
+        "turned " + robot.cumulativeTurnDeg);
+    assertTrue(robot.positionCm().distanceTo(Vec2.of(0, 0)) < 1e-9, "drove " + robot.positionCm());
+  }
+
+  @Test
+  void aRouteIsAbandonedMidDriveWhenItsConditionFails() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    int[] checks = {0};
+    assertEquals(Navigator.DriveResult.ABORTED, nav(robot).goTo(Vec2.of(300, 0),
+        new Navigator.Travel().keepGoingWhile(() -> ++checks[0] < 20)));
+    assertTrue(robot.isStopped());
+    assertTrue(robot.positionCm().x > 10 && robot.positionCm().x < 300, "at " + robot.positionCm());
+  }
+
+  @Test
+  void aPlannedRouteStartsAndEndsAtPointsTooCloseToAWallToPlanFrom() {
+    // (-600, 965) and (-300, 965) are 17 cm from the north wall, inside the planner's 30 cm
+    // clearance: the route steps out to open floor first and back in at the end.
+    KinematicRobot robot = new KinematicRobot(Vec2.of(-600, 965), 0);
+    Vec2 target = Vec2.of(-300, 965);
+    assertEquals(Navigator.RouteResult.CLEAN, nav(robot).driveViaPlan(target, new Navigator.Travel()));
+    assertTrue(robot.positionCm().distanceTo(target) < 5, "ended at " + robot.positionCm());
+  }
 }
