@@ -50,10 +50,7 @@ final class Mission {
     if (routes != Routes.HAND_TUNED) {
       Log.info("Using the " + routes.name + " carry and return routes");
     }
-
-    Log.phase("PHASE 1: Clearing path");
-    stats.beginPhase(PHASE_CLEARING);
-    nav.followRoute(Routes.CLEARING_PATH);
+    clearPath();
 
     boolean atDropoff = false;
     int delivered = 0;
@@ -62,15 +59,10 @@ final class Mission {
       int jarNumber = delivered + 1;
       Log.phase("COLLECTING JAR " + jarNumber + " of " + Config.JAR_COUNT);
       stats.beginJar(jarNumber);
-
-      stats.beginPhase(PHASE_TO_SEARCH);
-      List<Vec2> route = atDropoff ? routes.dropoffToSearch : Routes.TO_SEARCH_POINT;
-      nav.followRoute(route);
+      goToSearchPoint(atDropoff);
       atDropoff = false;
 
-      stats.beginPhase(PHASE_SEARCH);
-      if (!jars.searchAndGrab()) {
-        stats.recordFailedSearch();
+      if (!searchAndGrab()) {
         failedInARow++;
         Log.warn("search failed (" + failedInARow + " in a row)");
         if (failedInARow >= Config.MAX_CONSECUTIVE_FAILED_SEARCHES) {
@@ -81,21 +73,51 @@ final class Mission {
       }
       failedInARow = 0;
 
-      stats.beginPhase(PHASE_TO_DROPOFF);
-      nav.followRoute(routes.searchToDropoff);
-
-      stats.beginPhase(PHASE_PLACE);
-      jars.place(delivered);
+      deliver(delivered);
       atDropoff = true;
       delivered++;
-      stats.jarDelivered();
       Log.info("Jars remaining: " + (Config.JAR_COUNT - delivered));
     }
 
+    finish(delivered);
+    return delivered;
+  }
+
+  private void clearPath() {
+    Log.phase("PHASE 1: Clearing path");
+    stats.beginPhase(PHASE_CLEARING);
+    nav.followRoute(Routes.CLEARING_PATH);
+  }
+
+  /** From the start (or after a failed search) the short route; from the drop-off the long one. */
+  private void goToSearchPoint(boolean fromDropoff) {
+    stats.beginPhase(PHASE_TO_SEARCH);
+    List<Vec2> route = fromDropoff ? routes.dropoffToSearch : Routes.TO_SEARCH_POINT;
+    nav.followRoute(route);
+  }
+
+  private boolean searchAndGrab() {
+    stats.beginPhase(PHASE_SEARCH);
+    if (jars.searchAndGrab()) {
+      return true;
+    }
+    stats.recordFailedSearch();
+    return false;
+  }
+
+  /** Carries the held jar to the drop-off and places it in slot {@code jarIndex}. */
+  private void deliver(int jarIndex) {
+    stats.beginPhase(PHASE_TO_DROPOFF);
+    nav.followRoute(routes.searchToDropoff);
+    stats.beginPhase(PHASE_PLACE);
+    jars.place(jarIndex);
+    stats.jarDelivered();
+  }
+
+  private void finish(int delivered) {
     stats.endPhase();
     Log.phase(delivered == Config.JAR_COUNT ? "ALL JARS COLLECTED!" : "MISSION INCOMPLETE");
     Log.block(stats.report());
-    return delivered;
   }
 
   private void startUp() {

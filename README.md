@@ -43,7 +43,7 @@ This repository holds **two versions side by side**:
 | End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
 | Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
 | No jar can be found | Retries forever | Stops after 3 attempts with a report |
-| Tests / CI | none | 68 JUnit tests covering 96% of v2's logic; SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
+| Tests / CI | none | 114 JUnit tests covering 99% of v2's logic and catching 95% of injected bugs (mutation testing); SpotBugs clean (v1: 10 findings); GitHub Actions on JDK 11 and 21 |
 | Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
 | Repo opens in Webots | No: flat layout, missing robot protos, stale `.class` built from older code | Standard Webots project layout, with reconstructed robot protos included |
 
@@ -207,13 +207,15 @@ This runs both worlds without a window (using `xvfb-run` on Linux) and judges th
 ```bash
 tools/run-tests.sh
 ```
-This compiles both controllers, runs the 68 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
+This compiles both controllers, runs the 114 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and both figures above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
 ```bash
 WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
 ```
 
-Add `--coverage` to measure line coverage of the v2 controller with JaCoCo. It's currently 96% of the logic, and 84% overall, since `WebotsPlatform` and the entry point only run inside Webots. The HTML report lands in `build/coverage/index.html`.
+Add `--coverage` to measure line coverage of the v2 controller with JaCoCo. It's currently 99% of the logic, and 88% overall, since `WebotsPlatform` and the entry point only run inside Webots. The HTML report lands in `build/coverage/index.html`.
+
+Coverage only shows which lines ran, not whether a test would notice if they were wrong. `tools/mutation-test.sh` checks that: [PIT](https://pitest.org/) makes hundreds of small changes to v2's logic (flips a comparison, drops a call, returns a constant) and reruns the tests against each one. Currently 95% of the changes make a test fail; CI requires at least 90%. The rest are reviewed in [BEFORE_AND_AFTER.md](docs/BEFORE_AND_AFTER.md#how-this-was-checked-and-what-still-needs-checking).
 
 ---
 
@@ -233,6 +235,7 @@ tools/
   build-controllers.sh         compile both controllers so Webots can run them
   run-in-webots.sh             run v1 and v2 headless in Webots and compare them
   static-analysis.sh           SpotBugs on both controllers (v2 must be clean)
+  mutation-test.sh             PIT mutation testing of v2 (at least 90% must be caught)
   webots/                      observer supervisor used by run-in-webots.sh
   BeforeAfterBenchmark.java    v1 vs v2 measurements (ideal model, then with motor lag and wheel slip)
   BeforeAfterFigure.java       draws docs/images/before-after.svg

@@ -98,69 +98,86 @@ final class JarHandler {
     return best;
   }
 
-  /** v1 carefullyApproachGreen: creep forward, steering towards the greenest third of the image. */
+  /**
+   * v1 carefullyApproachGreen: creep forward, steering towards the greenest third of the image,
+   * until the bumper is pressed (then grab). Gives up if the jar stays out of sight, the robot
+   * stops making progress, or {@link Config#APPROACH_TIMEOUT_STEPS} pass.
+   */
   boolean approachAndGrab() {
     Log.info("Approaching jar");
     int stepsWithoutJar = 0;
-    double s = Config.APPROACH_SPEED;
     Vec2 checkpoint = robot.positionCm();
     for (int step = 1; step <= Config.APPROACH_TIMEOUT_STEPS; step++) {
       robot.step();
       if (robot.jarTouched()) {
-        robot.stop();
         return grab();
       }
 
       RgbImage image = robot.captureImage();
       Vision.SectorCounts counts = Vision.countGreen(image);
-      if (counts.total() < Config.APPROACH_LOST_PIXELS) {
-        if (++stepsWithoutJar > Config.APPROACH_MAX_STEPS_WITHOUT_JAR) {
-          robot.stop();
-          Log.info("Lost sight of the jar; aborting approach (" + v1Count(image) + ")");
-          return false;
-        }
-      } else {
-        stepsWithoutJar = 0;
+      stepsWithoutJar = counts.total() < Config.APPROACH_LOST_PIXELS ? stepsWithoutJar + 1 : 0;
+      if (stepsWithoutJar > Config.APPROACH_MAX_STEPS_WITHOUT_JAR) {
+        stopApproach("Lost sight of the jar; aborting approach (" + v1Count(image) + ")");
+        return false;
       }
-
       if (step % 20 == 0) {
         Log.info("  approach step " + step + ": " + counts.total() + " px " + counts
             + " (" + v1Count(image) + ")");
       }
 
-      switch (Vision.steer(counts)) {
-        case LEFT:
-          robot.drive(s * Config.APPROACH_INNER_FACTOR, s * Config.APPROACH_OUTER_FACTOR);
-          break;
-        case RIGHT:
-          robot.drive(s * Config.APPROACH_OUTER_FACTOR, s * Config.APPROACH_INNER_FACTOR);
-          break;
-        case STRAIGHT:
-          robot.drive(s, s);
-          break;
-        default:
-          robot.stop();
-          for (int i = 0; i < Config.REASSESS_PAUSE_STEPS; i++) {
-            robot.step();
-            if (robot.jarTouched()) {
-              return grab();
-            }
-          }
+      Vision.Steering steering = Vision.steer(counts);
+      if (steering != Vision.Steering.UNCLEAR) {
+        steer(steering);
+      } else if (pauseToReassess()) {
+        return grab();
       }
 
       if (step % Config.APPROACH_STALL_WINDOW_STEPS == 0) {
         Vec2 now = robot.positionCm();
         if (now.distanceTo(checkpoint) < Config.APPROACH_STALL_MIN_PROGRESS_CM) {
-          robot.stop();
-          Log.info("Not making progress (pushing against something); aborting approach");
+          stopApproach("Not making progress (pushing against something); aborting approach");
           return false;
         }
         checkpoint = now;
       }
     }
-    robot.stop();
-    Log.info("Approach timed out");
+    stopApproach("Approach timed out");
     return false;
+  }
+
+  /** v1's wheel speeds for each steering decision (UNCLEAR is handled by the caller). */
+  private void steer(Vision.Steering steering) {
+    double s = Config.APPROACH_SPEED;
+    switch (steering) {
+      case LEFT:
+        robot.drive(s * Config.APPROACH_INNER_FACTOR, s * Config.APPROACH_OUTER_FACTOR);
+        break;
+      case RIGHT:
+        robot.drive(s * Config.APPROACH_OUTER_FACTOR, s * Config.APPROACH_INNER_FACTOR);
+        break;
+      case STRAIGHT:
+        robot.drive(s, s);
+        break;
+      default:
+        throw new IllegalArgumentException("no wheel speeds for " + steering);
+    }
+  }
+
+  /** v1's "reassess" pause: stand still for a moment. Returns true if the bumper is pressed. */
+  private boolean pauseToReassess() {
+    robot.stop();
+    for (int i = 0; i < Config.REASSESS_PAUSE_STEPS; i++) {
+      robot.step();
+      if (robot.jarTouched()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private void stopApproach(String reason) {
+    robot.stop();
+    Log.info(reason);
   }
 
   /**

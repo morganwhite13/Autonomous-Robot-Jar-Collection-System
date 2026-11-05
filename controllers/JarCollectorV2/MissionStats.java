@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -33,10 +34,10 @@ final class MissionStats {
   private long phaseStartMs;
   private JarRecord currentJar;
 
-  int driveStalls;
-  int driveTimeouts;
-  int turnTimeouts;
-  int failedSearches;
+  private int driveStalls;
+  private int driveTimeouts;
+  private int turnTimeouts;
+  private int failedSearches;
 
   MissionStats(LongSupplier clockMs) {
     this.clockMs = clockMs;
@@ -81,6 +82,39 @@ final class MissionStats {
     failedSearches++;
   }
 
+  void recordDriveStall() {
+    driveStalls++;
+  }
+
+  void recordDriveTimeout() {
+    driveTimeouts++;
+  }
+
+  void recordTurnTimeout() {
+    turnTimeouts++;
+  }
+
+  int driveStalls() {
+    return driveStalls;
+  }
+
+  int driveTimeouts() {
+    return driveTimeouts;
+  }
+
+  int turnTimeouts() {
+    return turnTimeouts;
+  }
+
+  int failedSearches() {
+    return failedSearches;
+  }
+
+  /** Drive stalls, drive timeouts and turn timeouts: legs that didn't end where planned. */
+  int navigationProblems() {
+    return driveStalls + driveTimeouts + turnTimeouts;
+  }
+
   void jarDelivered() {
     if (currentJar != null) {
       currentJar.delivered = true;
@@ -99,15 +133,19 @@ final class MissionStats {
   }
 
   List<JarRecord> jars() {
-    return jars;
+    return Collections.unmodifiableList(jars);
   }
 
+  /** Time per phase so far, in the order the phases first ran (an open phase counts up to now). */
   Map<String, Long> phases() {
-    return phaseMs;
+    Map<String, Long> totals = new LinkedHashMap<>(phaseMs);
+    if (currentPhase != null) {
+      totals.merge(currentPhase, clockMs.getAsLong() - phaseStartMs, Long::sum);
+    }
+    return Collections.unmodifiableMap(totals);
   }
 
   String report() {
-    endPhase();
     long now = clockMs.getAsLong();
     StringBuilder sb = new StringBuilder();
     sb.append("==================== MISSION REPORT (v2) ====================\n");
@@ -115,7 +153,7 @@ final class MissionStats {
         "Result: %d/%d jars delivered in %.1f s of simulated time%n",
         jarsDelivered(), Config.JAR_COUNT, now / 1000.0));
     sb.append("\nTime by phase (summed over all jars)\n");
-    for (Map.Entry<String, Long> e : phaseMs.entrySet()) {
+    for (Map.Entry<String, Long> e : phases().entrySet()) {
       sb.append(String.format(Locale.ROOT, "  %-24s %8.1f s%n", e.getKey(), e.getValue() / 1000.0));
     }
     sb.append("\nJar   Time (s)  Scans  Approaches  Result\n");

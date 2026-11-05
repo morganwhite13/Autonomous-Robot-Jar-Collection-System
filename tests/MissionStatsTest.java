@@ -59,7 +59,8 @@ class MissionStatsTest {
     stats.beginJar(1);
     now = 12_300;
     stats.jarDelivered();
-    stats.driveStalls = 2;
+    stats.recordDriveStall();
+    stats.recordDriveStall();
     String report = stats.report();
     assertTrue(report.contains("1/5 jars delivered in 12.3 s"), report);
     assertTrue(report.contains("drive stalls=2"), report);
@@ -101,5 +102,36 @@ class MissionStatsTest {
     now = 5_000;
     assertTrue(stats.report().contains("  1        0.0      0           0  delivered"),
         stats.report());
+  }
+
+  @Test
+  void navigationProblemsAddUpStallsAndTimeouts() {
+    MissionStats stats = new MissionStats(() -> now);
+    stats.recordDriveStall();
+    stats.recordDriveTimeout();
+    stats.recordDriveTimeout();
+    stats.recordTurnTimeout();
+    stats.recordTurnTimeout();
+    stats.recordTurnTimeout();
+    stats.recordFailedSearch();
+    assertEquals(1, stats.driveStalls());
+    assertEquals(2, stats.driveTimeouts());
+    assertEquals(3, stats.turnTimeouts());
+    assertEquals(6, stats.navigationProblems());
+    assertEquals(1, stats.failedSearches());
+    assertTrue(stats.report().contains(
+        "drive stalls=1, drive timeouts=2, turn timeouts=3, failed searches=1"), stats.report());
+  }
+
+  @Test
+  void anOpenPhaseCountsUpToNowWithoutBeingClosed() {
+    MissionStats stats = new MissionStats(() -> now);
+    now = 2_000;
+    stats.beginPhase("Search");
+    now = 5_000;
+    assertEquals(3_000L, stats.phases().get("Search"));
+    stats.report(); // reporting doesn't close the phase...
+    now = 6_000;
+    assertEquals(4_000L, stats.phases().get("Search")); // ...so it keeps counting
   }
 }

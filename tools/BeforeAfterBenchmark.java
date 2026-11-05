@@ -67,7 +67,7 @@ public class BeforeAfterBenchmark {
     MissionStats s = mission.stats();
     row(md, "Whole mission in the model (no box physics)", "not ported",
         delivered + "/5 jars, " + f0(robot.elapsedMs() / 1000.0) + " s simulated, "
-            + s.driveStalls + " stalls, " + s.turnTimeouts + " turn timeouts");
+            + s.driveStalls() + " stalls, " + s.turnTimeouts() + " turn timeouts");
   }
 
   /** Every (start, target) heading pair on a grid; does the turn finish, and how fast? */
@@ -191,7 +191,7 @@ public class BeforeAfterBenchmark {
     MissionStats s = mission.stats();
     row(md, "Whole mission in the model (no box physics)", "not ported (see note)",
         delivered + "/5 jars, " + f0(robot.elapsedMs() / 1000.0) + " s simulated, "
-            + s.driveStalls + " stalls, " + s.turnTimeouts + " turn timeouts");
+            + s.driveStalls() + " stalls, " + s.turnTimeouts() + " turn timeouts");
 
     KinematicRobot plannedRobot = robot(world.robotStart, 90);
     for (WorldFile.Obstacle jar : world.ofKind(WorldFile.Kind.HONEY_JAR)) {

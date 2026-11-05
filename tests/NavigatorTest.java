@@ -48,7 +48,7 @@ class NavigatorTest {
     MissionStats stats = new MissionStats(robot::elapsedMs);
     assertEquals(false, new Navigator(robot, stats).turnTo(90, Config.MAX_SPEED));
     assertEquals(Config.TURN_TIMEOUT_STEPS, robot.stepsTaken());
-    assertEquals(1, stats.turnTimeouts);
+    assertEquals(1, stats.turnTimeouts());
   }
 
   @Test
@@ -79,7 +79,7 @@ class NavigatorTest {
     robot.blocked = p -> p.x > 100;
     MissionStats stats = new MissionStats(robot::elapsedMs);
     assertEquals(Navigator.DriveResult.STALLED, new Navigator(robot, stats).driveTo(Vec2.of(300, 0)));
-    assertEquals(1, stats.driveStalls);
+    assertEquals(1, stats.driveStalls());
     assertTrue(robot.stepsTaken() < 2 * Config.STALL_WINDOW_STEPS + 100);
   }
 
@@ -163,7 +163,7 @@ class NavigatorTest {
     MissionStats stats = new MissionStats(circling::elapsedMs);
     assertEquals(Navigator.DriveResult.TIMED_OUT,
         new Navigator(circling, stats).driveTo(Vec2.of(300, 0)));
-    assertEquals(1, stats.driveTimeouts);
+    assertEquals(1, stats.driveTimeouts());
     assertEquals(Math.max(Config.DRIVE_TIMEOUT_MIN_STEPS, (int) (300 * Config.DRIVE_TIMEOUT_STEPS_PER_CM)),
         circling.steps);
     assertTrue(circling.isStopped());

@@ -44,8 +44,8 @@ class MissionTest {
       assertTrue(jar.x < -940 && jar.y > 590 && jar.y < 740, "jar left at " + jar);
     }
     MissionStats stats = mission.stats();
-    assertEquals(0, stats.driveStalls + stats.driveTimeouts + stats.turnTimeouts);
-    assertEquals(0, stats.failedSearches);
+    assertEquals(0, stats.navigationProblems());
+    assertEquals(0, stats.failedSearches());
   }
 
   @Test
@@ -75,6 +75,11 @@ class MissionTest {
     }
     Log.useSink(line -> { });
     assertEquals(logs.get(0), logs.get(1));
+    // The run ends by logging the result and the report.
+    String log = logs.get(0);
+    assertTrue(log.contains("ALL JARS COLLECTED!"), log);
+    assertTrue(log.indexOf("MISSION REPORT") > log.indexOf("ALL JARS COLLECTED!"));
+    assertTrue(log.contains("5/5 jars delivered"));
   }
 
   @Test
@@ -82,8 +87,9 @@ class MissionTest {
     KinematicRobot robot = new KinematicRobot(world.robotStart, 90).withStepLimit(1_000_000);
     Mission mission = new Mission(robot);
     assertEquals(0, mission.run());
-    assertEquals(Config.MAX_CONSECUTIVE_FAILED_SEARCHES, mission.stats().failedSearches);
+    assertEquals(Config.MAX_CONSECUTIVE_FAILED_SEARCHES, mission.stats().failedSearches());
     assertTrue(mission.stats().report().contains("0/5 jars delivered"));
+    assertTrue(mission.stats().jars().stream().noneMatch(jar -> jar.delivered));
   }
 
   @Test
@@ -105,8 +111,8 @@ class MissionTest {
     robot.jars.add(world.ofKind(WorldFile.Kind.HONEY_JAR).get(1).center); // only one jar
     Mission mission = new Mission(robot);
     assertEquals(1, mission.run());
-    assertEquals(Config.MAX_CONSECUTIVE_FAILED_SEARCHES, mission.stats().failedSearches);
-    assertEquals(0, mission.stats().driveStalls + mission.stats().driveTimeouts);
+    assertEquals(Config.MAX_CONSECUTIVE_FAILED_SEARCHES, mission.stats().failedSearches());
+    assertEquals(0, mission.stats().driveStalls() + mission.stats().driveTimeouts());
   }
 
   @Test

@@ -18,7 +18,9 @@ Line numbers below refer to [`controllers/ProjectController3/ProjectController3.
 
 **Done:**
 - Both controllers compile against the real Webots R2025a `Controller.jar`. CI compiles them against API stubs whose signatures were copied from that jar.
-- 68 JUnit tests, covering 96% of the lines in v2's logic (measured with `tools/run-tests.sh --coverage`). Most run v2's real navigation, search and mission classes on a kinematic model of the Pioneer 3-DX (wheel radius 9.75 cm, axle track 33 cm, 32 ms steps, synthetic 64x64 camera).
+- 114 JUnit tests, covering 99% of the lines in v2's logic (measured with `tools/run-tests.sh --coverage`). Most run v2's real navigation, search and mission classes on a kinematic model of the Pioneer 3-DX (wheel radius 9.75 cm, axle track 33 cm, 32 ms steps, synthetic 64x64 camera). A small scripted fake covers the edge cases the model can't stage, such as exact pixel counts or the bumper pressing mid-pause.
+- Mutation testing (`tools/mutation-test.sh`, [PIT](https://pitest.org/)): of 369 small deliberate bugs injected into v2's logic, the tests catch 349 (95%). The first run caught only 56%, even with 96% line coverage, which is what prompted most of the tests above. The 20 that survive were each checked by hand. 8 can't change behaviour, such as `d < 0` vs `d <= 0` before a wrap-around that maps 360 back to 0. 6 only change log text. 6 only differ when a measured distance or angle lands exactly on a threshold, like 2.000… cm of progress. CI fails below 90%.
+- Refactors are checked against a recorded baseline: full mission logs from 6 scenarios (ideal model, planned routes, motor lag and wheel slip, one jar, no jars, blocked start) plus every way an approach can end. The logs, timings, positions and wheel commands must match the previous version exactly.
 - The v1 methods being compared were ported line for line into [`tests/LegacyV1.java`](../tests/LegacyV1.java) and measured on the same model ([`docs/benchmark-results.md`](benchmark-results.md)). [`LegacyBehaviourTest`](../tests/LegacyBehaviourTest.java) pins each v1 behaviour described here, so the claims fail loudly if they stop being true.
 - Route geometry was checked against the obstacles parsed from the `.wbt` file.
 
@@ -200,7 +202,7 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 | Stale compiled controller | `ProjectController3.class` was committed. It was compiled from an older version of the source: it contains `findJar()`, `toStart()` and `hardcodedPath()`, which don't exist in the `.java`. Webots never compiles Java controllers by itself; it runs the `.class` it finds. So anyone who opened the repository ran that old code, not the source. | Deleted (still in git history) and `*.class` ignored. Build from source with `tools/build-controllers.sh` or Webots' Build button (the README now says so). |
 | Not a Webots project | Flat files. Webots looks for `controllers/<name>/` next to `worlds/`, and the world loads `../protos/*.proto`. | Standard `worlds/` + `controllers/` + `protos/` layout. |
 | Missing robot protos | The world needs `Pioneer3dx.proto` and `Pioneer3Gripper.proto`, which were never committed, so nobody else could open it. | Included in `protos/`, reconstructed from Webots R2021b. Every node type and field is checked statically against R2025a; not yet loaded in Webots. See [`protos/README.md`](../protos/README.md). |
-| No tests or CI | none | 68 JUnit tests (96% line coverage of v2's logic) and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and figures are up to date. |
+| No tests or CI | none | 114 JUnit tests (99% line coverage of v2's logic, 95% mutation score) and GitHub Actions on JDK 11 and 21. CI also checks that the generated benchmark and figures are up to date. |
 
 ---
 
@@ -208,14 +210,15 @@ for (int i = 0; i < Config.TURN_TIMEOUT_STEPS; i++) {
 
 | | v1 | v2 |
 |---|---|---|
-| Layout | 1 file, 765 lines (574 of code), everything `static` | 14 focused files (13 classes and the `RobotPlatform` interface), 1,326 lines (943 of code; the rest is comments and blank lines) |
+| Layout | 1 file, 765 lines (574 of code), everything `static` | 14 focused files (13 classes and the `RobotPlatform` interface), 1,469 lines (1,044 of code; the rest is comments and blank lines) |
 | Webots API use | Spread through every method | Only in [`WebotsPlatform`](../controllers/JarCollectorV2/WebotsPlatform.java). Everything else uses the [`RobotPlatform`](../controllers/JarCollectorV2/RobotPlatform.java) interface, so it can be tested without Webots |
 | Tunable numbers | Literals scattered through methods | All in [`Config`](../controllers/JarCollectorV2/Config.java), each marked "v1" (unchanged) or "new" |
 | Waypoints | Rebuilt inline in 5 methods | Defined once, named, in [`Routes`](../controllers/JarCollectorV2/Routes.java) |
 | Duplicate code | Camera-to-array copy twice (lines 217-228, 300-311); position read 7 times | One `captureImage()`, one `positionCm()` |
 | Dead code | `WORLD_WIDTH`/`WORLD_HEIGHT`, blue-pixel counting, `GreenDetection.greenLeft/Center/Right`, `moveHardcodedAhead`'s always-`false` return, the 400-step limit | Removed |
 | Telemetry | Progress messages without times | Every log line has the simulated time, and each run ends with a mission report: time per phase, per-jar scans and approaches, stalls, timeouts |
-| Tests | 0 | 68, covering 96% of v2's logic lines (84% including the two classes that only run inside Webots) |
+| Tests | 0 | 114, covering 99% of v2's logic lines (88% including the two classes that only run inside Webots) |
+| Mutation testing ([PIT](https://pitest.org/)) | n/a | 95% of injected bugs caught (349/369); at least 90% enforced in CI (`tools/mutation-test.sh`) |
 | Static analysis ([SpotBugs](https://spotbugs.github.io/), maximum effort, every priority) | 10 findings, all low severity: 5 unread fields, 3 `Math.floor` calls on constants, an int made via `nextDouble`, a field-naming slip | 0, enforced in CI (`tools/static-analysis.sh`) |
 
 ---

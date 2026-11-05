@@ -67,7 +67,7 @@ final class Navigator {
       robot.step();
     }
     robot.stop();
-    stats.turnTimeouts++;
+    stats.recordTurnTimeout();
     Log.warn(String.format(Locale.ROOT, "turn to %.0f deg timed out at %.0f deg",
         targetDeg, robot.headingDeg()));
     return false;
@@ -108,7 +108,7 @@ final class Navigator {
         Vec2 now = robot.positionCm();
         if (now.distanceTo(checkpoint) < Config.STALL_MIN_PROGRESS_CM) {
           robot.stop();
-          stats.driveStalls++;
+          stats.recordDriveStall();
           Log.warn("stalled at " + now + " while driving to " + target + "; skipping to next leg");
           return DriveResult.STALLED;
         }
@@ -117,7 +117,7 @@ final class Navigator {
       }
     }
     robot.stop();
-    stats.driveTimeouts++;
+    stats.recordDriveTimeout();
     Log.warn("drive to " + target + " timed out at " + robot.positionCm());
     return DriveResult.TIMED_OUT;
   }
