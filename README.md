@@ -1,611 +1,217 @@
-# 🤖 Autonomous Warehouse Robot - Webots Simulation
+# 🤖 Autonomous Warehouse Robot: Webots Simulation
 
-An advanced autonomous mobile robot simulation built in **Webots** that navigates a 20×20 meter warehouse environment to locate, collect, and organize honey jars using computer vision, multi-sensor fusion, and intelligent pathfinding.
+[![CI](https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System/actions/workflows/ci.yml/badge.svg)](https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System/actions/workflows/ci.yml)
 
-**Tech Stack:** Webots R2025a, Java, Computer Vision, Robotics  
-**Status:** ✅ Complete and Operational  
+An autonomous Pioneer 3-DX robot in **Webots** that clears a path through a 20 × 20 m warehouse, finds five honey jars with its camera, picks each one up with its gripper and delivers it to its own drop-off pad, with no human input.
 
----
+**Tech stack:** Webots R2025a, Java, computer vision, robotics.
 
-## 📋 Table of Contents
+This repository holds **two versions side by side**:
 
-- [Quick Summary](#quick-summary)
-- [Video Demos](#-video-demos)
-- [The Challenge](#-the-challenge)
-- [System Architecture](#-system-architecture)
-- [Algorithm Highlights](#-algorithm-highlights)
-- [Key Technical Achievements](#-key-technical-achievements)
-- [Performance Results](#-performance-results)
-- [Challenges & Solutions](#-challenges--solutions)
-- [Code Architecture](#-code-architecture)
-- [Installation & Setup](#-installation--setup)
-- [Usage](#-usage)
-- [What I Learned](#-what-i-learned)
-- [Future Improvements](#-future-improvements)
-- [Project Structure](#-project-structure)
-- [Acknowledgments](#-acknowledgments)
+| | |
+|---|---|
+| **v1: original** | The controller from the demo videos, kept **byte-for-byte unchanged** in [`controllers/ProjectController3`](controllers/ProjectController3/ProjectController3.java) |
+| **v2: improved** | Same routes, thresholds and gripper timings, restructured into testable classes with 9 bugs and 4 smaller issues fixed, in [`controllers/JarCollectorV2`](controllers/JarCollectorV2/) |
+
+👉 **[Full before/after write-up](docs/BEFORE_AND_AFTER.md)**: each fix with the original line numbers, plus [measured results](docs/benchmark-results.md).
 
 ---
 
-## 📺 Video Demos
+## 📺 Video demos (v1)
 
-- **[Main Robot Demo](https://www.youtube.com/watch?v=kO9e8dzjCfg)** - Full autonomous mission with robot collecting jars
-- **[Top-Down Overview](https://www.youtube.com/watch?v=dIo8oXvvNeM)** - Aerial view of warehouse navigation and collection
-- **[Robot Camera Feed](https://www.youtube.com/watch?v=sPnMvLkUqaw)** - Real-time vision processing and object detection
-
----
-
-## Quick Summary
-
-An autonomous mobile robot built in Webots that uses computer vision, sensor fusion, and pathfinding algorithms to navigate a 20×20 meter warehouse, locate honey jars, collect them, and place them in designated storage areas—all without human intervention.
-
-**Key Stats:**
-- ✅ 100% Success Rate (5/5 jars collected)
-- 🎯 ±3° Heading Accuracy, ±10cm Position Accuracy
-- 📊 ~10-15 minutes per complete mission
-- 🔧 30+ waypoint navigation system
-- 👁️ Real-time color-based object detection
-- 🦾 Synchronized gripper manipulation
+- **[Main robot demo](https://www.youtube.com/watch?v=kO9e8dzjCfg)**: a full autonomous mission collecting the jars
+- **[Top-down overview](https://www.youtube.com/watch?v=dIo8oXvvNeM)**: aerial view of navigation and collection
+- **[Robot camera feed](https://www.youtube.com/watch?v=sPnMvLkUqaw)**: what the robot sees while it searches and approaches
 
 ---
 
-## 🎯 The Challenge
+## ⚖️ Before and after at a glance
 
-Design and implement a fully autonomous robot system that can:
-- Navigate a complex warehouse environment with 30+ obstacles
-- Detect and locate small objects using only onboard sensors
-- Manipulate objects with a gripper system
-- Return collected items to a designated drop-off zone
-- Repeat this process for multiple objects
-- Operate without GPS, pre-mapped routes, or external guidance systems
+| | v1 (before) | v2 (after) |
+|---|---|---|
+| After a failed search for jars 2-5 | Drives a 17.8 m straight line through 4 immovable wooden boxes | Returns 0.8 m to the search point |
+| Robot blocked while driving | Pushes forever | Detects the stall in ~4 s and moves on |
+| "360°" jar scan | Covers ~271° (fixed 200 steps) | Covers 370°, measured by the compass |
+| Turn finishes (6,240 start/target pairs, kinematic model) | 91.8%. Can bounce across the ±3° window forever | 100% |
+| End of a 530 cm leg started 2.9° off | 26.8 cm from the waypoint | 1.1 cm |
+| Longest approach before the time limit aborts it | ~58 cm (jars start 50-162 cm away) | Aborts only when not moving; ~176 cm cap |
+| No jar can be found | Retries forever | Stops after 3 attempts with a report |
+| Tests / CI | none | 46 JUnit tests, GitHub Actions on JDK 11 and 21 |
+| Telemetry | Progress messages | Simulated-time log plus an end-of-run mission report |
+| Repo opens in Webots | No: flat layout, missing protos, stale `.class` built from older code | Standard Webots project layout; missing protos documented |
+
+The numbers come from running ports of v1's methods and the real v2 classes on the same kinematic model of the robot. **Neither version has been re-run in Webots since the rewrite**; see [how it was checked](docs/BEFORE_AND_AFTER.md#how-this-was-checked-and-what-still-needs-checking).
 
 ---
 
-## 🏗️ System Architecture
+## 🗺️ The mission
 
-### Hardware Configuration (Simulated)
+![Mission map: walls, static wooden boxes, pushable cardboard boxes, jars, and the waypoint routes](docs/images/mission-map.svg)
 
-**Mobile Platform:** Pioneer 3-DX Robot
-- Differential drive locomotion (left/right wheel motors)
-- Max speed: 5 m/s
-- Arena: 20m × 20m warehouse with 30+ cardboard boxes
+*Generated from the world file and the controller's waypoints by [`tools/MapRenderer.java`](tools/MapRenderer.java). The unused southern half of the arena is cropped.*
 
-**Sensing Suite:**
-- 📷 **Camera**: 64×64 RGB with color-based object detection
-- 📡 **Distance Sensors**: 6× ultrasonic sensors (SO0, SO1, SO3, SO4, SO6, SO7)
-- 🧭 **Compass**: 3-axis heading sensor (±3° accuracy)
-- 🔲 **Touch Sensor**: Precise object contact detection
-- ⚡ **Accelerometer**: Stability monitoring
+1. **Clear the path**: follow a 15-waypoint route from the start, pushing cardboard boxes aside, and end at the search point outside the jar bay.
+2. **Search**: rotate a full turn, scoring each camera frame by how many jar-green pixels it contains, with a bonus when they're in the centre third. Turn to the best heading.
+3. **Approach and grab**: creep forward, steering towards whichever third of the image is clearly greenest, until the front bumper is pressed. Then close the gripper and lift.
+4. **Deliver**: follow a 10-waypoint route to the drop-off lane, line up with that jar's pad (one per jar, 30 cm apart), release, back out.
+5. **Repeat** from the drop-off for the remaining jars.
 
-**Manipulation System:**
-- 🎮 **Lift Motor**: Vertical gripper movement
-- 🤲 **Finger Motors**: Parallel gripper (left & right)
-- Coordinated control with timed sequences
+---
 
-### Software Architecture
+## 🏗️ How it works
+
+### Simulated hardware
+
+| Part | Used for |
+|---|---|
+| **Pioneer 3-DX** differential drive | Wheel speed up to 5 rad/s (≈0.49 m/s) |
+| **Camera**, 64 × 64 RGB, 45° field of view | Finding and steering towards jars |
+| **Compass** | Heading for every turn and for measuring the scan |
+| **Touch sensor** (front bumper) | Knowing when a jar is between the gripper fingers |
+| **Pioneer gripper** (lift motor and two finger motors) | Grabbing, lifting and releasing jars |
+| **Supervisor API** | Ground-truth position for waypoint navigation |
+| 6 sonar sensors | Printed once in the start-up self-test; not used for navigation (yet) |
+
+### Jar detection
+
+A pixel counts as jar green when `R < 120`, `G > 35` and `B < 120` (v1's thresholds). v2 also requires green to beat red and blue by 10 so grey and brown pixels don't count. The frame is split into left / centre / right thirds (21 / 22 / 21 columns):
+
+- **Scan score** = green pixels, **+50** if the centre third has the most.
+- **Approach steering**: if one third leads both others by more than 10 pixels, turn towards it (inner wheel ×0.3, outer ×1.2). If the centre leads, or there are more than 30 green pixels, go straight. Otherwise stop for 5 steps and look again.
+- **Give up** after 31 frames in a row with fewer than 15 green pixels.
+
+### Navigation (v2)
+
+Each leg turns in place towards the waypoint, then drives to it:
+- **Turn:** full speed until within 30° of the target, then proportional slow-down, stopping within ±3°. The error is computed safely across 0°/360°.
+- **Drive:** full speed with a small proportional correction towards the waypoint, stopping once the robot has travelled the leg's length (v1's rule). If it moves less than 2 cm in 40 steps it reports a stall and continues with the next leg.
+
+### v2 code structure
+
+| Class | Responsibility |
+|---|---|
+| [`JarCollectorV2`](controllers/JarCollectorV2/JarCollectorV2.java) | Webots entry point |
+| [`Mission`](controllers/JarCollectorV2/Mission.java) | The phase sequence, knows where the robot is, retry limit |
+| [`Navigator`](controllers/JarCollectorV2/Navigator.java) | Turning, driving, stall detection |
+| [`JarHandler`](controllers/JarCollectorV2/JarHandler.java) | Scan, approach, grab, place |
+| [`Vision`](controllers/JarCollectorV2/Vision.java) | Pixel classification, sector counts, steering decision (pure functions) |
+| [`Routes`](controllers/JarCollectorV2/Routes.java) | All waypoints, defined once |
+| [`Config`](controllers/JarCollectorV2/Config.java) | Every tunable number, each marked "v1" or "new" |
+| [`RobotPlatform`](controllers/JarCollectorV2/RobotPlatform.java) / [`WebotsPlatform`](controllers/JarCollectorV2/WebotsPlatform.java) | The robot interface, and its Webots implementation (the only class that uses the Webots API) |
+| [`MissionStats`](controllers/JarCollectorV2/MissionStats.java), [`Log`](controllers/JarCollectorV2/Log.java) | Telemetry and simulated-time logging |
+| [`Angles`](controllers/JarCollectorV2/Angles.java), [`Vec2`](controllers/JarCollectorV2/Vec2.java), [`RgbImage`](controllers/JarCollectorV2/RgbImage.java) | Small value types and heading arithmetic |
+
+Because the mission logic only talks to `RobotPlatform`, the tests can run it against [`KinematicRobot`](tests/KinematicRobot.java), a differential-drive model with a synthetic camera, without Webots.
+
+At the end of every run v2 prints a report like this one (this example is from the kinematic model, so the times will differ in Webots):
 
 ```
-ProjectController3.java (800+ lines)
-├── Initialization Phase
-│   ├── Motor setup (wheels, gripper)
-│   ├── Sensor configuration (camera, compass, distance)
-│   └── Field and environment setup
-│
-├── Phase 1: Obstacle Clearing
-│   ├── hardcodedPathPushing()
-│   ├── 15+ waypoint navigation
-│   └── Box pushing and path creation
-│
-├── Phase 2: Jar Detection & Collection (Main Loop)
-│   ├── intelligentJarSearch()
-│   ├── rotateAndFindGreen()
-│   ├── carefullyApproachGreen()
-│   └── executeGrab()
-│
-├── Phase 3: Return Navigation
-│   ├── navigateToDropoff()
-│   ├── navigateToSearchArea()
-│   └── navigateFromDropoffToSearch()
-│
-├── Phase 4: Placement & Release
-│   ├── placeJar()
-│   ├── Gripper control sequences
-│   └── Jar counter increment
-│
-├── Navigation Module
-│   ├── makeHardcodedTurn()
-│   ├── moveHardcodedAhead()
-│   └── waypoint execution
-│
-├── Perception Module
-│   ├── countColor() - RGB analysis
-│   ├── getCompassReadingInDegrees()
-│   └── Sensor data interpretation
-│
-└── Control Module
-    ├── liftLowerGripper()
-    ├── openCloseGripper()
-    └── Motor synchronization
+==================== MISSION REPORT (v2) ====================
+Result: 5/5 jars delivered in 815.2 s of simulated time
+
+Time by phase (summed over all jars)
+  Start-up                      1.3 s
+  Clearing path                89.4 s
+  Travel to search point      234.8 s
+  Search and grab             168.7 s
+  Carry to drop-off           284.4 s
+  Place jar                    36.4 s
+
+Jar   Time (s)  Scans  Approaches  Result
+  1       86.8      1           1  delivered
+  ...
+Anomalies: drive stalls=0, drive timeouts=0, turn timeouts=0, failed searches=0
 ```
 
 ---
 
-## 🔧 Algorithm Highlights
-
-### 1. Color-Based Object Detection
-
-The robot's camera divides its field of view into three zones and counts colored pixels in real-time:
-
-**Green Detection (Honey Jars):**
-```
-Target Signature: R < 120, G > 35, B < 120
-Left Section:     0 to 21 pixels
-Center Section:   22 to 42 pixels  
-Right Section:    43 to 63 pixels
-
-Decision Logic:
-- If green_left > green_center + 15px       → Turn left
-- If green_right > green_center + 15px      → Turn right
-- If green_center dominant                  → Move forward
-- If total green > threshold                → Approach enabled
-```
-
-**Blue Detection (Drop-off Zone):**
-```
-Target Signature: R < 20, G < 20, B > 80
-Used for navigation guidance during return phase
-```
-
-### 2. Intelligent Jar Search Algorithm
-
-**Phase 1: Rotation & Scan**
-```
-1. Rotate 360° at incremental angles
-2. At each position, capture camera image
-3. Extract RGB channels for entire frame
-4. Count green pixels in left/center/right sections
-5. Calculate score: (total_green_pixels) + 50 if centered
-6. Track detection with highest score
-7. Return: best angle, pixel count, and section
-```
-
-**Phase 2: Turn to Target**
-```
-1. Calculate angular difference between current heading and target
-2. Choose shortest rotation path (±180° logic)
-3. Dynamically adjust motor speeds to maintain heading
-4. Terminate when within ±3° of target angle
-```
-
-**Phase 3: Careful Approach**
-```
-1. Move forward at reduced speed (MAX_SPEED / 8)
-2. Continuously monitor camera for green object
-3. Adjust heading based on green position:
-   - Green on left:    left_motor = speed × 0.3, right_motor = speed × 1.2
-   - Green on right:   left_motor = speed × 1.2, right_motor = speed × 0.3
-   - Green centered:   both_motors = speed
-4. Check touch sensor every iteration
-5. If touch detected → Execute gripper sequence
-6. Track steps without green → Abort after 30 steps
-7. Maximum approach time: 400 steps (safety timeout)
-```
-
-**Phase 4: Grab Verification**
-```
-1. Verify touch sensor still active
-2. Stop all movement
-3. Close gripper gradually (100 iterations)
-4. Lift object with synchronized gripper hold (120 iterations)
-5. Stabilize and verify (20 iterations)
-6. Return success/failure for mission continuation
-```
-
-### 3. Navigation & Pathfinding
-
-The robot executes multiple phases with hardcoded waypoints optimized for the specific environment:
-
-**Phase 1: Obstacle Clearing**
-- 15+ waypoint path that clears 30 cardboard boxes
-- Creates navigable pathways for collection phase
-- Estimated time: ~2-3 minutes
-
-**Phase 2: Jar Detection & Collection**
-- Searches from designated search area
-- Uses 360° rotation to locate jars
-- Careful approach with continuous visual feedback
-- Gripper sequence upon contact
-- Estimated time: 2-3 minutes per jar
-
-**Phase 3: Return Navigation**
-- Follows optimized 10-waypoint return path
-- Reduced speed (1 m/s) during precision turns
-- Full speed (5 m/s) on open terrain
-- Estimated time: ~2-3 minutes per jar
-
-**Phase 4: Placement & Release**
-- Positions robot at storage bay
-- Opens gripper to release jar
-- Reverses away and increments counter
-
-### 4. Turn Algorithm (Precision Compass-Based)
-
-```
-Calculate target heading from waypoint coordinates
-    ↓
-Compare current heading (from compass) to target
-    ↓
-Calculate difference angle (handles ±180° wraparound)
-    ↓
-Determine shortest rotation direction
-    ↓
-Adjust motor velocities:
-  - If turning left:  left_motor = -MAX_SPEED, right_motor = +MAX_SPEED
-  - If turning right: left_motor = +MAX_SPEED, right_motor = -MAX_SPEED
-    ↓
-Monitor compass continuously
-    ↓
-Dynamic correction to maintain heading
-    ↓
-Hold until within ±3° of target → Stop and proceed
-```
-
-This ensures accuracy even when overshooting or dealing with compass noise.
-
-### 5. Sensor Fusion Strategy
-
-Multi-layered detection prevents false positives and ensures robust operation:
-
-| Sensor | Purpose | Application |
-|--------|---------|-------------|
-| **Vision** | Object detection | Identifies jar location and direction |
-| **Compass** | Orientation tracking | Validates proper heading during navigation |
-| **Distance Sensors** | Obstacle detection | Prevents collisions with walls and boxes |
-| **Touch Sensor** | Contact confirmation | Verifies object proximity before gripper engagement |
-| **Accelerometer** | Stability monitoring | Detects unusual movement patterns |
-
----
-
-## ✨ Key Technical Achievements
-
-✅ **Robust Object Detection** - Color thresholding with three-tier fallback logic handles variable lighting conditions  
-✅ **Precision Navigation** - Turn accuracy within ±3°, distance accuracy within ±10cm  
-✅ **Intelligent Search** - 360° rotation scanning with best-match selection algorithm  
-✅ **Gripper Synchronization** - Timed sequences (100+ iterations) ensure proper grip establishment  
-✅ **Sensor Fusion** - Combines 6 distance sensors, camera, compass, and touch for redundant perception  
-✅ **Real-Time Control** - 30-31 Hz control cycle with 64 fps camera processing  
-✅ **Obstacle Avoidance** - 6 distance sensors prevent collisions throughout mission  
-✅ **State Management** - Clean separation between clearing, collection, navigation, and placement phases  
-✅ **Scalability** - System design supports 5+ jars (easily configurable)  
-✅ **Coordinate Space Handling** - Centimeter-scale integer math eliminates floating-point errors  
-
----
-
-## 📊 Performance Results
-
-| Metric | Value |
-|--------|-------|
-| **Success Rate** | 100% (5/5 jars collected) |
-| **Navigation Accuracy (Heading)** | ±3° |
-| **Navigation Accuracy (Position)** | ±10cm |
-| **Gripper Engagement Time** | ~10 seconds per object |
-| **Total Mission Time** | ~10-15 minutes for 5 jars |
-| **Sensor Update Rate** | 32-64 fps |
-| **Control Frequency** | 30-31 Hz |
-| **Waypoint Count** | 30+ total |
-| **Obstacles Handled** | 30+ cardboard boxes |
-| **Arena Size** | 20×20 meters |
-| **Detection Range** | 0.5-2 meters |
-
----
-
-## 🚧 Challenges & Solutions
-
-### Challenge 1: Object Detection Ambiguity
-
-**Problem:** Camera color detection could fail under poor lighting or angle variations. Multiple detections at different angles could cause the robot to pursue false positives.
-
-**Solution:** Implemented three-tier fallback detection logic with scoring:
-1. **Primary**: Significant color magnitude difference (15+ pixels between sections)
-2. **Secondary**: Relative magnitude comparison accounting for lighting variations
-3. **Tertiary**: Raw pixel counts above minimum threshold (20+ pixels)
-4. **Scoring system**: Bonus points (+50) for centered detections to prefer straight approaches
-
-**Code Pattern:**
-```java
-int score = totalGreen;
-if (section.equals("center")) {
-    score += 50; // Bonus for centered
-}
-if (score > bestScore) {
-    bestScore = score;
-    // Record detection
-}
-```
-
-**Result:** 100% detection rate across all test runs, zero false positives
-
----
-
-### Challenge 2: Navigation Precision in Large Arena
-
-**Problem:** Hardcoded waypoints required sub-decimeter accuracy in a large 20m × 20m arena. Floating-point coordinate systems introduced rounding errors.
-
-**Solution:** 
-- Convert all coordinates to centimeter units (×100) for integer-based comparisons
-- Real-time position monitoring from Supervisor API
-- Early termination when distance threshold reached
-- Compass-based turn validation with dynamic correction
-- Waypoint distance calculated using Euclidean distance with tolerance of ±10cm
-
-**Code Pattern:**
-```java
-double values[] = TranslationField.getSFVec3f();
-double x = (values[0] * 100);  // Convert to centimeters
-double y = -(values[2] * 100);
-double distance = Math.sqrt((x-x1)*(x-x1) + (y-y1)*(y-y1));
-if (distance >= desiredDistance) break;
-```
-
-**Result:** Consistent ±10cm accuracy throughout entire mission
-
----
-
-### Challenge 3: Gripper Synchronization
-
-**Problem:** Premature gripper opening or incomplete closure could drop collected jars mid-transport. Motor position changes need time to physically manifest.
-
-**Solution:** Timed delay loops (100+ iterations) allow motor positions to stabilize before executing next operation. Each gripper sequence includes discrete phases with verification:
-
-1. **Closing Phase**: 100 iterations at 0.01 position
-2. **Lifting Phase**: 120 iterations with coordinated lift and grip
-3. **Stabilization Phase**: 20 iterations of holding before release
-
-**Code Pattern:**
-```java
-for (int i = 0; i < 100; i++) {
-  robot.step(timeStep);
-  openCloseGripper(0.01f);  // Gradual closure
-  leftMotor.setVelocity(0);
-  rightMotor.setVelocity(0);
-}
-```
-
-**Result:** Zero jar drops across all 5 collection cycles
-
----
-
-### Challenge 4: Large Coordinate Space Management
-
-**Problem:** 20m × 20m arena with floating-point precision issues could cause navigation drift and rounding errors accumulating over long paths.
-
-**Solution:** Store all internal coordinates in centimeters (integer-scale):
-- Position: 2000cm × 2000cm (instead of 20m × 20m)
-- Waypoints: Integer-based ArrayList<Point>
-- Distance calculations: Integer arithmetic until final comparison
-- Compass reading: Integer angles (0-360°)
-
-**Impact:** Eliminated floating-point rounding errors, improved navigation stability by ~15%, reduced computational overhead
-
----
-
-### Challenge 5: Approach Timeout & Loss of Target
-
-**Problem:** During careful approach phase, robot could enter infinite loop if target is lost, or stall against walls/obstacles.
-
-**Solution:** Implemented safety mechanisms:
-1. **Visual loss detection**: Track consecutive steps without green detection (max 30 steps)
-2. **Timeout abort**: Maximum 400 steps per approach attempt
-3. **Failed approach recovery**: Back up distance and retry from rotated angle
-4. **Max rotation attempts**: 3 full 360° rotations before declaring failure
-5. **Random repositioning**: If search fails, move to different location and retry
-
-**Code Pattern:**
-```java
-if (totalGreen < 15) {
-    stepsWithoutGreen++;
-    if (stepsWithoutGreen > maxStepsWithoutGreen) {
-        leftMotor.setVelocity(0);
-        rightMotor.setVelocity(0);
-        return false;  // Abort approach
-    }
-}
-```
-
-**Result:** Zero hangs or infinite loops across extended test runs
-
----
-
-## 💻 Code Architecture
-
-### Main Components
-
-```
-ProjectController3.java (800+ lines)
-├── Initialization
-│   ├── Motor setup (wheels, gripper)
-│   ├── Sensor setup (camera, compass, distance)
-│   └── Field initialization
-│
-├── Navigation Methods
-│   ├── makeHardcodedTurn(x1, y1, x2, y2)
-│   ├── moveHardcodedAhead(x1, y1, x2, y2)
-│   ├── executeHardcodedPath(ArrayList<Point>)
-│   ├── rotateByDegrees(degrees, timeStep)
-│   └── turnToAngle(targetAngle, timeStep)
-│
-├── Perception Methods
-│   ├── countColor(r[][], g[][], b[][])
-│   ├── rotateAndFindGreen(timeStep)
-│   ├── getCompassReadingInDegrees(compass)
-│   └── intelligentJarSearch(timeStep)
-│
-├── Manipulation Methods
-│   ├── liftLowerGripper(position)
-│   ├── openCloseGripper(position)
-│   ├── carefullyApproachGreen(timeStep)
-│   ├── executeGrab(timeStep)
-│   └── placeJar(timeStep)
-│
-└── Navigation Planning
-    ├── navigateToSearchArea()
-    ├── navigateToDropoff()
-    ├── navigateFromDropoffToSearch()
-    ├── hardcodedPathPushing()
-    ├── moveRandomly(timeStep)
-    └── backUpDistance(timeStep, steps)
-```
-
-### Design Patterns Used
-
-- **Supervisor Architecture**: Absolute position knowledge via Webots Supervisor API (eliminating odometry drift)
-- **State Machines**: Implicit states (clearing → collection → return → placement)
-- **Hardware Abstraction**: Centralized sensor/motor initialization for easy reconfiguration
-- **Modular Methods**: Single responsibility principle for each function
-- **Timed Sequences**: Time-step based loops for deterministic behavior
-- **Data Classes**: GreenDetection class for encapsulating vision data
-
-### Key Code Snippets
-
-**Intelligent Jar Search:**
-```java
-private static boolean intelligentJarSearch(int timeStep) {
-    // Attempts full 360° rotations to locate jar
-    // Uses best detection metrics to approach target
-    // Executes careful approach with continuous feedback
-    // Verifies contact with touch sensor
-    // Returns success/failure for retry logic
-}
-```
-
-**Vision Processing:**
-```java
-static private int[][] countColor(int[][] r, int[][] g, int[][] b) {
-    // Processes RGB channels from camera
-    // Detects green: R<120 AND G>35 AND B<120
-    // Divides frame into 3 sections for spatial awareness
-    // Returns pixel counts per section
-}
-```
-
-**Navigation Control:**
-```java
-private static void makeHardcodedTurn(double x1, double y1, 
-                                       double x2, double y2) {
-    // Calculates heading to waypoint
-    // Uses compass for real-time correction
-    // Adjusts motor speeds for smooth turning
-    // Stops within ±3° of target heading
-}
-```
-
----
-
-## 🚀 Installation & Setup
+## 🚀 Running it
 
 ### Prerequisites
+- **[Webots R2025a](https://cyberbotics.com/)**
+- **JDK 11 or newer** on your `PATH` (Webots compiles Java controllers itself)
+- **The robot protos.** The world loads `protos/Pioneer3dx.proto` and `protos/Pioneer3Gripper.proto`, which aren't in the repository. See [`protos/README.md`](protos/README.md): copy in your originals, or try `tools/fetch-protos.sh` (untested).
 
-- **Webots R2025a** or compatible version
-- **Java Development Kit (JDK) 11+**
-- **Git** for cloning the repository
-- Minimum 4GB RAM recommended
+### In Webots
+1. `git clone https://github.com/morganwhite13/Autonomous-Robot-Jar-Collection-System.git`
+2. Add the protos (above).
+3. **File → Open World** and choose:
+   - `worlds/ProjectWorld2025.wbt` for **v1**, or
+   - `worlds/ProjectWorld2025_v2.wbt` for **v2** (same world, different controller).
+4. Press ▶. The console shows progress; v2 prefixes every line with the simulated time and ends with the mission report.
 
-### Installation Steps
+### Tests (no Webots needed)
+```bash
+tools/run-tests.sh
+```
+This compiles both controllers, runs the 46 JUnit tests, and regenerates [`docs/benchmark-results.md`](docs/benchmark-results.md) and the map above. JUnit is downloaded on first run. To compile against your real Webots install instead of the bundled API stubs, set `WEBOTS_HOME`:
 
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/yourusername/autonomous-warehouse-robot.git
-   cd autonomous-warehouse-robot
-   ```
-
-2. **Install Webots**
-   - Download from [official Webots website](https://cyberbotics.com/)
-   - Follow platform-specific installation instructions
-   - Verify installation: `webots --version`
-
-3. **Prepare Java Environment**
-   ```bash
-   # Verify Java installation
-   java -version
-   javac -version
-   ```
-
-4. **Open Project in Webots**
-   - Launch Webots
-   - File → Open World
-   - Navigate to `simulation/ProjectWorld2025.wbt`
-   - Click "Open"
+```bash
+WEBOTS_HOME=/usr/local/webots tools/run-tests.sh
+```
 
 ---
 
-## 🎮 Usage
+## 📁 Repository layout
 
-### Running the Simulation
-
-1. **Start Simulation**
-   - In Webots, click the ▶ **Play** button (or press spacebar)
-   - The robot will begin initialization and debugging output
-
-2. **Monitor Output**
-   - Check the Webots console for status messages:
-     ```
-     === SENSOR DEBUG TEST ===
-     === PHASE 1: Clearing path ===
-     === COLLECTING JAR 1 ===
-     Jars remaining: 4
-     === ALL JARS COLLECTED! ===
-     ```
-
-3. **Watch Robot Behavior**
-   - **0-3 min**: Robot clears obstacles by pushing boxes
-   - **3-5 min**: Navigates to search area
-   - **5-8 min**: Rotates 360° to detect first jar
-   - **8-10 min**: Carefully approaches and collects jar
-   - **10-13 min**: Returns to dropoff zone
-   - **13-15 min**: Places jar and repeats for remaining jars
-
-4. **Completion**
-   - Program exits when all 5 jars are collected
-   - Final message: `=== ALL JARS COLLECTED! ===`
+```
+worlds/
+  ProjectWorld2025.wbt         v1 world (unchanged)
+  ProjectWorld2025_v2.wbt      same world, runs the v2 controller
+controllers/
+  ProjectController3/          v1 controller (unchanged)
+  JarCollectorV2/              v2 controller
+protos/                        robot protos go here (see README inside)
+tests/                         JUnit tests, kinematic robot model, ports of v1 methods
+tools/
+  run-tests.sh                 build + test + regenerate docs
+  BeforeAfterBenchmark.java    v1 vs v2 measurements
+  MapRenderer.java             draws docs/images/mission-map.svg
+  WorldFile.java               reads obstacle footprints from the .wbt file
+  fetch-protos.sh              rebuilds the robot protos from Webots R2021b (untested)
+  webots-stubs/                compile-only Webots API stubs for CI
+docs/
+  BEFORE_AND_AFTER.md          the full comparison
+  benchmark-results.md         generated measurements
+  v1-original-README.md        the original README, unchanged
+```
 
 ---
 
-## 🎓 What I Learned
+## 🎓 What I learned
 
-This project taught me fundamental concepts across multiple disciplines:
-
-### Robotics Fundamentals
+### Robotics fundamentals
 - Sensor integration and fusion techniques
 - Motor control and feedback loop design
 - Path planning in constrained environments
 - Real-time control system architecture
 
-### Computer Vision
-- Color space analysis (RGB thresholding)
+### Computer vision
+- Colour-space analysis (RGB thresholding)
 - Spatial segmentation techniques
-- Real-time image processing (64×64 at 64 fps)
-- Adaptive thresholding for variable lighting
+- Real-time image processing (a 64×64 frame every control step)
 
-### Real-Time Systems
+### Real-time systems
 - Timing-critical operations and control loops
-- Sensor synchronization and coordination
+- Sensor synchronisation and coordination
 - Hardware abstraction layers
-- Performance optimization under constraints
+- Performance optimisation under constraints
 
-### Problem-Solving & Debugging
+### Problem solving and debugging
 - Debugging with limited feedback (simulation logs)
 - Handling sensor noise and ambiguity
 - Iterative algorithm refinement through testing
 - Root cause analysis for mission failures
 
-### Software Engineering
-- Large codebase organization (800+ line single file)
+### Software engineering
+- Organising a large single-file controller, and later splitting it into focused classes (v2)
 - API design and hardware abstraction
 - State machine implementation
-- Performance optimization techniques
 - Code modularity and maintainability
+- Testing control logic without the simulator, using a kinematic model (v2)
+- Characterisation tests that pin down old behaviour before changing it (v2)
 
-### Practical Skills
+### Practical skills
 - Webots simulation environment mastery
 - Java real-time programming
 - Git version control and repository management
@@ -613,72 +219,41 @@ This project taught me fundamental concepts across multiple disciplines:
 
 ---
 
-## 🚀 Future Improvements
+## 🔮 Future improvements
 
-If I were to extend this project, I would prioritize:
+### Next, following on from v2
+1. Run both versions in Webots and put v2's mission report next to v1's run time
+2. Commit the robot protos so the repository runs as cloned
+3. Use the front sonars to detect obstacles, instead of only noticing a stall afterwards
+4. A real grab check, calibrated from the "camera now sees N green px" line v2 logs after each lift
 
-### Short-Term Improvements
-1. **Dynamic Pathfinding** - Replace hardcoded waypoints with A* or Dijkstra algorithm
-2. **Obstacle Mapping** - Build real-time obstacle map using distance sensors
-3. **Machine Learning** - Train CNN for robust object detection in variable lighting
-4. **Configuration File** - Externalize parameters (speeds, thresholds) to JSON/YAML
-
-### Medium-Term Enhancements
-5. **SLAM Implementation** - Add simultaneous localization and mapping for unknown environments
-6. **Multi-Robot Coordination** - Enable swarm behavior for collaborative collection
-7. **Reinforcement Learning** - Train agent to optimize behavior through trial and error
-8. **Web Dashboard** - Real-time monitoring and visualization of robot state
-
-### Long-Term Vision
-9. **Real Hardware Deployment** - Port to actual Pioneer 3-DX or mobile manipulator
-10. **Force Feedback Gripper** - Implement pressure sensing for delicate object handling
-11. **Behavior Trees** - More sophisticated state management for complex tasks
-12. **ROS 2 Integration** - Enable compatibility with broader robotics ecosystem
-
----
-
-**Useful Resources:**
-- [Webots Documentation](https://cyberbotics.com/doc/reference/index)
-- [Java Robotics Programming Guide](https://cyberbotics.com/doc/guide/using-java)
-- [Computer Vision with OpenCV](https://docs.opencv.org/master/d9/df8/tutorial_root.html)
-- [Robotics Fundamentals Course](https://www.coursera.org/specializations/robotics)
+### Original roadmap
+5. **Dynamic pathfinding**: replace hardcoded waypoints with A* or Dijkstra (`tools/WorldFile.java` already extracts the obstacle footprints)
+6. **Obstacle mapping**: build a real-time obstacle map from the distance sensors
+7. **Machine learning**: train a CNN for robust detection in variable lighting
+8. **Configuration file**: externalise parameters. *Partly done: v2 gathers them all in `Config.java`*
+9. **SLAM**: simultaneous localisation and mapping for unknown environments
+10. **Multi-robot coordination**: swarm behaviour for collaborative collection
+11. **Reinforcement learning**: let an agent optimise its behaviour through trial and error
+12. **Web dashboard**: real-time monitoring of the robot's state
+13. **Real hardware**: port to an actual Pioneer 3-DX or mobile manipulator
+14. **Force-feedback gripper**: pressure sensing for delicate objects
+15. **Behaviour trees**: more sophisticated state management
+16. **ROS 2 integration**: compatibility with the wider robotics ecosystem
 
 ---
 
 ## 🏆 Acknowledgments
 
-- **Webots Simulation Platform** - Professional robotics simulator
-- **Cyberbotics** - Comprehensive documentation and community support
-- **Java Community** - Robust cross-platform development tools
-- **Pioneer 3-DX Community** - Reference implementations and best practices
+- **Webots simulation platform**: professional robotics simulator
+- **Cyberbotics**: comprehensive documentation and community support
+- **Java community**: robust cross-platform development tools
+- **Pioneer 3-DX community**: reference implementations and best practices
 
 ---
 
-## 📈 Technical Metrics
-
-**Code Statistics:**
-- **Total Lines of Code**: 800+
-- **Methods**: 25+
-- **Classes**: 1 main class + 1 inner data class
-- **Complexity**: Moderate (straightforward logic, clear flow)
-- **Test Coverage**: 100% of core mission paths
-
-**Performance Metrics:**
-- **Control Loop Frequency**: 30-31 Hz
-- **Camera Processing**: 64 fps
-- **Memory Usage**: ~50-100 MB
-- **CPU Usage**: 15-25% (single core)
-- **Simulation Speed**: ~1x real-time
-
----
-
-*Last Updated: January 2026*  
-*Webots Version: R2025a*  
-*Java Version: JDK 11+*
-
-
-## 📞 Contact & Support
+## 📞 Contact
 
 - [**Portfolio**](https://morganwhite13.github.io/)
-- [**Email**](morgan13white@icloud.com)
+- [**Email**](mailto:morgan13white@icloud.com)
 - [**LinkedIn**](https://www.linkedin.com/in/morgan-white-95b245237/)
