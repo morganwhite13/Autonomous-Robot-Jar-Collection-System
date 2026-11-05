@@ -104,6 +104,13 @@ final class Config {
   // ------------------------------------------------------------------ approach
   /** v1: approach at MAX_SPEED / 8. */
   static final double APPROACH_SPEED = MAX_SPEED / 8;
+  /**
+   * new: approach at this speed while the jar is estimated to be more than FAST_APPROACH_UNTIL_CM
+   * away, then creep at APPROACH_SPEED as v1 did all the way. Set FAST_APPROACH_SPEED to
+   * APPROACH_SPEED for v1 behaviour.
+   */
+  static final double FAST_APPROACH_SPEED = MAX_SPEED / 3;
+  static final double FAST_APPROACH_UNTIL_CM = 75;
   /** v1: inner/outer wheel factors when steering towards the jar. */
   static final double APPROACH_INNER_FACTOR = 0.3;
   static final double APPROACH_OUTER_FACTOR = 1.2;
@@ -208,4 +215,32 @@ final class Config {
   static final int DETOUR_BACKUP_STEPS = 25;
   /** new: how far from the robot (or a waypoint near a wall) to look for open floor to plan from. */
   static final double DETOUR_FIND_FREE_CM = 80;
+  // ------------------------------------------------------------------ camera geometry (new)
+  /**
+   * new: where the camera is, for estimating how far away a jar is from the lowest row it shows
+   * in (ground-plane geometry: the camera looks straight ahead, so a jar's base appears higher in
+   * the image the further away it is). Measured in Webots with a jar at known distances: the
+   * estimate is within 5 cm out to 1 m and within 15 cm out to 1.5 m.
+   */
+  static final double CAMERA_HEIGHT_CM = 16.5;
+  /** Camera ahead of the robot's centre. */
+  static final double CAMERA_AHEAD_CM = 14;
+  /** Pixels per unit of tan(angle): 32 / tan(22.5 deg) for the 64-pixel, 45-degree camera. */
+  static final double CAMERA_FOCAL_PX = 77.25;
+  /** Honey jar radius (the proto's collision cylinder). */
+  static final double JAR_RADIUS_CM = 4.5;
+  // ------------------------------------------------------------------ jar map (new)
+  /**
+   * new: during a full scan, record where each jar seen appears to be. Later searches from the
+   * search point turn straight to the nearest remembered jar and check it is there, instead of
+   * scanning a full turn again. If it isn't, they fall back to the scan. Set to false for v1
+   * behaviour (scan every time).
+   */
+  static final boolean REMEMBER_JARS = true;
+  /** new: sightings this close together are the same jar. */
+  static final double JAR_MAP_MERGE_CM = 25;
+  /** new: a jar must be seen in at least this many scan frames to be remembered. */
+  static final int JAR_MAP_MIN_SIGHTINGS = 2;
+  /** new: after a grab, forget remembered jars this close to where the grabbed jar was. */
+  static final double JAR_MAP_FORGET_CM = 30;
 }

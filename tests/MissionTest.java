@@ -144,9 +144,25 @@ class MissionTest {
       assertEquals(i + 1, stats.jars().get(i).number);
     }
     for (MissionStats.JarRecord jar : stats.jars()) {
-      assertTrue(jar.delivered && jar.scans >= 1 && jar.approaches >= 1 && jar.endMs > jar.startMs);
+      assertTrue(jar.delivered && jar.approaches >= 1 && jar.endMs > jar.startMs);
     }
     assertTrue(stats.report().contains("5/5 jars delivered"));
+  }
+
+  @Test
+  void laterJarsAreFoundFromTheFirstScanWithoutScanningAgain() {
+    Mission mission = new Mission(robotWithJars());
+    assertEquals(5, mission.run());
+    List<MissionStats.JarRecord> jars = mission.stats().jars();
+    assertEquals(1, jars.get(0).scans);
+    int scans = 0;
+    for (MissionStats.JarRecord jar : jars) {
+      scans += jar.scans;
+      assertEquals(1, jar.approaches, "jar " + jar.number);
+    }
+    // Seen from the search point, (845, -102) is right behind (850, 10), so the first scan
+    // maps them as one jar and the last one takes a second scan. v1 scanned for every jar.
+    assertEquals(2, scans);
   }
 
   @Test

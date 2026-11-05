@@ -1,3 +1,6 @@
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Jar detection from a camera frame. Pure functions, no Webots dependency.
  *
@@ -110,4 +113,86 @@ final class Vision {
   static int scanScore(SectorCounts c) {
     return c.total() + (c.dominant() == Sector.CENTER ? Config.SCAN_CENTER_BONUS : 0);
   }
+
+  /** A run of adjacent image columns that contain jar-green pixels: usually one jar. */
+  static final class Blob {
+    final int fromColumn;
+    final int toColumn;
+    final int lowestRow;
+    final int pixels;
+
+    Blob(int fromColumn, int toColumn, int lowestRow, int pixels) {
+      this.fromColumn = fromColumn;
+      this.toColumn = toColumn;
+      this.lowestRow = lowestRow;
+      this.pixels = pixels;
+    }
+
+    double centreColumn() {
+      return (fromColumn + toColumn) / 2.0;
+    }
+  }
+
+  /** The jar-green blobs in a frame, left to right. */
+  static List<Blob> blobs(RgbImage image) {
+    List<Blob> blobs = new ArrayList<>();
+    int start = -1;
+    int lowest = -1;
+    int pixels = 0;
+    for (int x = 0; x <= image.width; x++) {
+      int columnPixels = 0;
+      int columnLowest = -1;
+      for (int y = 0; x < image.width && y < image.height; y++) {
+        if (isJarGreen(image.red(x, y), image.green(x, y), image.blue(x, y))) {
+          columnPixels++;
+          columnLowest = y;
+        }
+      }
+      if (columnPixels > 0) {
+        if (start < 0) {
+          start = x;
+        }
+        lowest = Math.max(lowest, columnLowest);
+        pixels += columnPixels;
+      } else if (start >= 0) {
+        blobs.add(new Blob(start, x - 1, lowest, pixels));
+        start = -1;
+        lowest = -1;
+        pixels = 0;
+      }
+    }
+    return blobs;
+  }
+
+  /** Lowest image row (largest index) holding a jar-green pixel, or -1 if there is none. */
+  static int lowestGreenRow(RgbImage image) {
+    int lowest = -1;
+    for (Blob b : blobs(image)) {
+      lowest = Math.max(lowest, b.lowestRow);
+    }
+    return lowest;
+  }
+
+  /**
+   * Distance from the robot's centre to the centre of a jar whose lowest pixel is in
+   * {@code row}, from the camera geometry in {@link Config}. Infinite if the row is at or above
+   * the horizon (or there is no jar).
+   */
+  static double distanceCm(int row) {
+    double belowHorizon = row - (IMAGE_ROWS - 1) / 2.0;
+    if (row < 0 || belowHorizon <= 0) {
+      return Double.POSITIVE_INFINITY;
+    }
+    return Config.CAMERA_HEIGHT_CM * Config.CAMERA_FOCAL_PX / belowHorizon
+        + Config.CAMERA_AHEAD_CM + Config.JAR_RADIUS_CM;
+  }
+
+  /** How far left of the camera's axis (degrees) something in this column is. */
+  static double bearingOffsetDeg(double column) {
+    return Math.toDegrees(Math.atan(((IMAGE_COLUMNS - 1) / 2.0 - column) / Config.CAMERA_FOCAL_PX));
+  }
+
+  /** The camera's resolution (Webots default, 64 x 64). */
+  static final int IMAGE_ROWS = 64;
+  static final int IMAGE_COLUMNS = 64;
 }

@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import java.util.function.BooleanSupplier;
@@ -13,6 +15,10 @@ import java.util.function.BooleanSupplier;
  *       wall" timeout was guessing at) instead of after a fixed 300 steps, which was only about
  *       58 cm of travel and too short for most jars from the search point.</li>
  *   <li>The random wander uses a seeded generator so runs are repeatable.</li>
+ *   <li>The approach drives faster while the jar is still far away ({@link
+ *       Config#FAST_APPROACH_SPEED}), judged from the lowest image row it shows in.</li>
+ *   <li>A full scan also maps where each jar seen is; later searches head straight for the
+ *       nearest one instead of scanning again ({@link Config#REMEMBER_JARS}).</li>
  * </ul>
  */
 final class JarHandler {
@@ -35,6 +41,8 @@ final class JarHandler {
   private final MissionStats stats;
   private final Random random;
   private final boolean verifyGrabs;
+  /** Where jars were seen in the last full scan and haven't been picked up since. */
+  private final List<Vec2> rememberedJars = new ArrayList<>();
 
   JarHandler(RobotPlatform robot, Navigator nav, MissionStats stats, Random random) {
     this(robot, nav, stats, random, Config.VERIFY_GRABS);
@@ -51,6 +59,9 @@ final class JarHandler {
 
   /** v1 intelligentJarSearch: up to 3 scan-and-approach attempts. True once a jar is held. */
   boolean searchAndGrab() {
+    if (Config.REMEMBER_JARS && grabRememberedJar()) {
+      return true;
+    }
     for (int attempt = 1; attempt <= Config.MAX_SCANS_PER_SEARCH; attempt++) {
       Log.info("Search attempt " + attempt + "/" + Config.MAX_SCANS_PER_SEARCH);
       stats.recordScan();
@@ -65,6 +76,7 @@ final class JarHandler {
       nav.turnTo(best.headingDeg, Config.MANOEUVRE_SPEED);
       stats.recordApproach();
       if (approachAndGrab()) {
+        forgetGrabbedJar();
         return true;
       }
       Log.info("Approach failed; backing up");
@@ -73,9 +85,60 @@ final class JarHandler {
     return false;
   }
 
-  /** Rotates one full turn (measured by the compass) and returns the best-scoring detection. */
+  /**
+   * Turns to the nearest jar remembered from an earlier scan and, if the camera sees it there,
+   * approaches and grabs it. A jar that isn't where it was seen is forgotten.
+   */
+  private boolean grabRememberedJar() {
+    while (!rememberedJars.isEmpty()) {
+      Vec2 here = robot.positionCm();
+      Vec2 target = rememberedJars.get(0);
+      for (Vec2 jar : rememberedJars) {
+        if (here.distanceTo(jar) < here.distanceTo(target)) {
+          target = jar;
+        }
+      }
+      Log.info("Heading for the jar remembered at " + target);
+      nav.turnTo(here.bearingTo(target), Config.MANOEUVRE_SPEED);
+      robot.step(); // a fresh frame from the new heading
+      Vision.SectorCounts counts = Vision.countGreen(robot.captureImage());
+      if (counts.total() > Config.SCAN_MIN_GREEN_PIXELS) {
+        stats.recordApproach();
+        if (approachAndGrab()) {
+          forgetGrabbedJar();
+          return true;
+        }
+        Log.info("Approach failed; backing up");
+        nav.driveSteps(-Config.MANOEUVRE_SPEED, Config.BACKUP_AFTER_FAILED_APPROACH_STEPS);
+      } else {
+        Log.info("No jar where one was remembered");
+      }
+      rememberedJars.remove(target);
+    }
+    return false;
+  }
+
+  /** After a grab: the held jar is just ahead of the robot; forget remembered jars there. */
+  private void forgetGrabbedJar() {
+    Vec2 here = robot.positionCm();
+    double h = Math.toRadians(robot.headingDeg());
+    double reach = Config.CAMERA_AHEAD_CM + 2 * Config.JAR_RADIUS_CM + 7; // bumper to jar centre
+    Vec2 held = Vec2.of(here.x + reach * Math.cos(h), here.y + reach * Math.sin(h));
+    rememberedJars.removeIf(jar -> jar.distanceTo(held) <= Config.JAR_MAP_FORGET_CM);
+  }
+
+  /** Jars currently remembered, nearest first is not guaranteed. */
+  List<Vec2> rememberedJars() {
+    return java.util.Collections.unmodifiableList(rememberedJars);
+  }
+
+  /**
+   * Rotates one full turn (measured by the compass) and returns the best-scoring detection. With
+   * {@link Config#REMEMBER_JARS}, also replaces the remembered jars with the ones seen.
+   */
   Detection scan() {
     Log.info("Scanning 360 degrees for green");
+    List<Vec2> sightings = new ArrayList<>();
     Detection best = null;
     double swept = 0;
     double previous = robot.headingDeg();
@@ -87,7 +150,11 @@ final class JarHandler {
       previous = heading;
 
       if (step % Config.SCAN_SAMPLE_EVERY_STEPS == 0) {
-        Vision.SectorCounts counts = Vision.countGreen(robot.captureImage());
+        RgbImage image = robot.captureImage();
+        if (Config.REMEMBER_JARS) {
+          sight(image, heading, sightings);
+        }
+        Vision.SectorCounts counts = Vision.countGreen(image);
         if (counts.total() > Config.SCAN_MIN_GREEN_PIXELS) {
           int score = Vision.scanScore(counts);
           if (best == null || score > best.score) {
@@ -103,7 +170,66 @@ final class JarHandler {
     if (Math.abs(swept) < Config.SCAN_SWEEP_DEG) {
       Log.warn(String.format(Locale.ROOT, "scan timed out after %.0f degrees", Math.abs(swept)));
     }
+    if (Config.REMEMBER_JARS) {
+      rememberedJars.clear();
+      rememberedJars.addAll(cluster(sightings));
+      if (!rememberedJars.isEmpty()) {
+        Log.info("Jars seen in the scan: " + rememberedJars);
+      }
+    }
     return best;
+  }
+
+  /** Adds where each jar in this frame appears to be, from the robot's pose. */
+  private void sight(RgbImage image, double headingDeg, List<Vec2> sightings) {
+    Vec2 here = robot.positionCm();
+    for (Vision.Blob blob : Vision.blobs(image)) {
+      double distance = Vision.distanceCm(blob.lowestRow);
+      // Only whole jars: one touching the frame's edge or bottom would be misjudged.
+      if (blob.fromColumn == 0 || blob.toColumn == image.width - 1
+          || blob.lowestRow >= image.height - 1 || Double.isInfinite(distance)) {
+        continue;
+      }
+      double bearing = Math.toRadians(headingDeg + Vision.bearingOffsetDeg(blob.centreColumn()));
+      sightings.add(Vec2.of(here.x + distance * Math.cos(bearing),
+          here.y + distance * Math.sin(bearing)));
+    }
+  }
+
+  /** Groups sightings within JAR_MAP_MERGE_CM; keeps groups seen often enough, averaged. */
+  static List<Vec2> cluster(List<Vec2> sightings) {
+    List<List<Vec2>> groups = new ArrayList<>();
+    for (Vec2 s : sightings) {
+      List<Vec2> home = null;
+      for (List<Vec2> g : groups) {
+        if (centre(g).distanceTo(s) <= Config.JAR_MAP_MERGE_CM) {
+          home = g;
+          break;
+        }
+      }
+      if (home == null) {
+        home = new ArrayList<>();
+        groups.add(home);
+      }
+      home.add(s);
+    }
+    List<Vec2> jars = new ArrayList<>();
+    for (List<Vec2> g : groups) {
+      if (g.size() >= Config.JAR_MAP_MIN_SIGHTINGS) {
+        jars.add(centre(g));
+      }
+    }
+    return jars;
+  }
+
+  private static Vec2 centre(List<Vec2> points) {
+    double x = 0;
+    double y = 0;
+    for (Vec2 p : points) {
+      x += p.x;
+      y += p.y;
+    }
+    return Vec2.of(x / points.size(), y / points.size());
   }
 
   /**
@@ -135,7 +261,7 @@ final class JarHandler {
 
       Vision.Steering steering = Vision.steer(counts);
       if (steering != Vision.Steering.UNCLEAR) {
-        steer(steering);
+        steer(steering, Vision.distanceCm(Vision.lowestGreenRow(image)));
       } else if (pauseToReassess()) {
         return grab();
       }
@@ -153,9 +279,13 @@ final class JarHandler {
     return false;
   }
 
-  /** v1's wheel speeds for each steering decision (UNCLEAR is handled by the caller). */
-  private void steer(Vision.Steering steering) {
-    double s = Config.APPROACH_SPEED;
+  /**
+   * v1's wheel speeds for each steering decision (UNCLEAR is handled by the caller), scaled up
+   * while the jar is estimated to be far away.
+   */
+  private void steer(Vision.Steering steering, double jarDistanceCm) {
+    double s = jarDistanceCm > Config.FAST_APPROACH_UNTIL_CM
+        ? Config.FAST_APPROACH_SPEED : Config.APPROACH_SPEED;
     switch (steering) {
       case LEFT:
         robot.drive(s * Config.APPROACH_INNER_FACTOR, s * Config.APPROACH_OUTER_FACTOR);

@@ -18,8 +18,9 @@ final class KinematicRobot implements RobotPlatform {
   static final int IMAGE_SIZE = 64;
   /** Robot centre to jar centre when the front bumper touches (bumper is 20.4 cm ahead). */
   static final double TOUCH_DISTANCE_CM = 25.0;
-  static final double JAR_RADIUS_CM = 5.0;
-  static final double JAR_HEIGHT_CM = 15.0;
+  static final double JAR_RADIUS_CM = 4.5;
+  /** Height of the top of the jar's green body (above it is the lid). */
+  static final double JAR_GREEN_TOP_CM = 10.2;
   static final int FLOOR = RgbImage.pack(190, 150, 110);
   static final int JAR = RgbImage.pack(30, 160, 30);
 
@@ -313,21 +314,31 @@ final class KinematicRobot implements RobotPlatform {
     java.util.Arrays.fill(px, FLOOR);
     Vec2 here = positionCm();
     double halfFov = Math.toRadians(FOV_DEG / 2);
-    double pxPerRad = (IMAGE_SIZE / 2.0) / halfFov;
     for (Vec2 jar : jars) {
       double d = Math.max(here.distanceTo(jar), 1);
       double rel = Math.toRadians(Angles.delta(heading, here.bearingTo(jar)));
       if (Math.abs(rel) > halfFov + Math.atan(JAR_RADIUS_CM / d)) {
         continue;
       }
-      // Positive rel = jar to the left = smaller column index.
-      double cx = IMAGE_SIZE / 2.0 - Math.tan(rel) / Math.tan(halfFov) * IMAGE_SIZE / 2.0;
-      double halfWidth = Math.atan(JAR_RADIUS_CM / d) * pxPerRad;
-      double halfHeight = Math.atan(JAR_HEIGHT_CM / 2 / d) * pxPerRad;
+      // Measured in Webots with a jar at known distances (26 cm to 2.3 m ahead): seen from the
+      // camera (CAMERA_HEIGHT_CM up, CAMERA_AHEAD_CM ahead of the centre, looking level), the
+      // jar's base at its front edge sets the lowest row, the top of its green body (10.2 cm
+      // up) at its far edge the highest, and its radius at its centre the width.
+      double focal = Config.CAMERA_FOCAL_PX;
+      double horizon = (IMAGE_SIZE - 1) / 2.0;
+      double ahead = Math.max(1, d * Math.cos(rel) - Config.CAMERA_AHEAD_CM);
+      double lateral = d * Math.sin(rel); // positive = left = smaller column index
+      double cx = horizon - focal * lateral / ahead;
+      double halfWidth = focal * JAR_RADIUS_CM / ahead;
       int x0 = (int) Math.max(0, Math.round(cx - halfWidth));
       int x1 = (int) Math.min(IMAGE_SIZE - 1, Math.round(cx + halfWidth));
-      int y0 = (int) Math.max(0, Math.round(IMAGE_SIZE / 2.0 - halfHeight));
-      int y1 = (int) Math.min(IMAGE_SIZE - 1, Math.round(IMAGE_SIZE / 2.0 + halfHeight));
+      int y0 = (int) Math.max(0, Math.min(IMAGE_SIZE - 1, Math.round(horizon
+          + focal * (Config.CAMERA_HEIGHT_CM - JAR_GREEN_TOP_CM) / (ahead + JAR_RADIUS_CM))));
+      int y1 = (int) Math.min(IMAGE_SIZE - 1, Math.round(
+          horizon + focal * Config.CAMERA_HEIGHT_CM / Math.max(1, ahead - JAR_RADIUS_CM)));
+      if (x1 < x0) {
+        continue;
+      }
       for (int row = y0; row <= y1; row++) {
         for (int col = x0; col <= x1; col++) {
           px[row * IMAGE_SIZE + col] = JAR;

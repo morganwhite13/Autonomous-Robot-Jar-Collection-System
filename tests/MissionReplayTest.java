@@ -63,7 +63,7 @@ class MissionReplayTest {
     assertTrue(svg.contains(">0/5 jars, stuck from 47 s<"), "v1 status");
     assertTrue(svg.contains(">v1 stuck from 47 s</text>"), "v1 label");
     assertTrue(svg.contains("pushing against a wooden box"), "v1 cause");
-    assertTrue(svg.contains(">5/5 jars, done at 957 s<"), "v2 status");
+    assertTrue(svg.contains(">5/5 jars, done at 894 s<"), "v2 status");
   }
 
   @Test

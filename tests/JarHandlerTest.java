@@ -145,12 +145,30 @@ class JarHandlerTest {
 
   @Test
   void approachThatNeverReachesTheJarTimesOutStopped() {
-    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
-    robot.jars.add(Vec2.of(210, 0)); // visible all the way, but out of reach in 900 steps
+    ScriptedRobot robot = new ScriptedRobot();
+    robot.center = 40; // always in view, dead ahead
+    robot.orbitRadiusCm = 100;
+    robot.orbitDegPerStep = 0.5; // always moving, so never "not making progress"
     assertFalse(handler(robot).approachAndGrab());
-    assertEquals(Config.APPROACH_TIMEOUT_STEPS, robot.stepsTaken());
+    assertEquals(Config.APPROACH_TIMEOUT_STEPS, robot.steps);
     assertTrue(robot.isStopped());
-    assertNull(robot.heldJar);
+  }
+
+  @Test
+  void aFarJarIsApproachedFasterThanANearOne() {
+    double[] far = firstApproachCommand(0); // jar's base high in the image: far away
+    double[] near = firstApproachCommand(61); // base near the bottom: about 60 cm
+    assertArrayEquals(new double[] {Config.FAST_APPROACH_SPEED, Config.FAST_APPROACH_SPEED}, far, 1e-12);
+    assertArrayEquals(new double[] {Config.APPROACH_SPEED, Config.APPROACH_SPEED}, near, 1e-12);
+  }
+
+  private double[] firstApproachCommand(int firstRow) {
+    ScriptedRobot robot = new ScriptedRobot();
+    robot.center = 40;
+    robot.firstRow = firstRow;
+    robot.touchedAtStep = step -> step >= 2;
+    handler(robot).approachAndGrab();
+    return robot.commands.get(0);
   }
 
   @Test
@@ -225,12 +243,14 @@ class JarHandlerTest {
   void approachSteersWithV1sWheelFactors() {
     double s = Config.APPROACH_SPEED;
     ScriptedRobot toTheLeft = new ScriptedRobot();
+    toTheLeft.firstRow = 61; // near: v1's creeping speed
     toTheLeft.left = 40;
     toTheLeft.touchedAtStep = step -> step >= 2;
     handler(toTheLeft).approachAndGrab();
     assertArrayEquals(new double[] {s * Config.APPROACH_INNER_FACTOR, s * Config.APPROACH_OUTER_FACTOR},
         toTheLeft.commands.get(0), 1e-12);
     ScriptedRobot toTheRight = new ScriptedRobot();
+    toTheRight.firstRow = 61;
     toTheRight.right = 40;
     toTheRight.touchedAtStep = step -> step >= 2;
     handler(toTheRight).approachAndGrab();
@@ -385,5 +405,32 @@ class JarHandlerTest {
     };
     exactly.touchedAtStep = step -> true;
     assertTrue(checkingHandler(exactly, new MissionStats(exactly::elapsedMs)).grab());
+  }
+
+  @Test
+  void sightingsOfTheSameJarAreMergedAndOneOffsDropped() {
+    java.util.List<Vec2> jars = JarHandler.cluster(java.util.List.of(
+        Vec2.of(100, 0), Vec2.of(110, 5), Vec2.of(95, -4), // one jar, three sightings
+        Vec2.of(300, 300), Vec2.of(305, 310), // another, two
+        Vec2.of(-200, 50))); // seen once: ignored
+    assertEquals(2, jars.size());
+    assertTrue(jars.get(0).distanceTo(Vec2.of(101.7, 0.3)) < 0.1, jars.get(0).toString());
+    assertTrue(jars.get(1).distanceTo(Vec2.of(302.5, 305)) < 0.1, jars.get(1).toString());
+  }
+
+  @Test
+  void aScanMapsTheJarsItSeesAndAGrabForgetsThatOne() {
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    robot.jars.add(Vec2.of(120, 0));
+    robot.jars.add(Vec2.of(0, 140));
+    JarHandler handler = handler(robot);
+    handler.scan();
+    java.util.List<Vec2> seen = handler.rememberedJars();
+    assertEquals(2, seen.size(), seen.toString());
+    for (Vec2 jar : robot.jars) {
+      assertTrue(seen.stream().anyMatch(s -> s.distanceTo(jar) < 15), jar + " not in " + seen);
+    }
+    assertTrue(handler.searchAndGrab());
+    assertEquals(1, handler.rememberedJars().size());
   }
 }

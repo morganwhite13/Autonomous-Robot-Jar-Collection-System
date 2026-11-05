@@ -10,6 +10,8 @@ class ScriptedRobot implements RobotPlatform {
   int left;
   int center;
   int right;
+  /** Row the green pixels start in (they fill 21 per row, downwards): the nearer, the lower. */
+  int firstRow;
   /** When set, overrides left/center/right: maps the step count to {left, center, right}. */
   java.util.function.IntFunction<int[]> sectorsAtStep;
   IntPredicate touchedAtStep = step -> false;
@@ -82,15 +84,15 @@ class ScriptedRobot implements RobotPlatform {
     java.util.Arrays.fill(px, RgbImage.pack(190, 150, 110));
     int[] sectors = sectorsAtStep == null ? new int[] {left, center, right}
         : sectorsAtStep.apply(steps);
-    paint(px, 0, sectors[0]);
-    paint(px, 21, sectors[1]);
-    paint(px, 43, sectors[2]);
+    paint(px, firstRow, 0, sectors[0]);
+    paint(px, firstRow, 21, sectors[1]);
+    paint(px, firstRow, 43, sectors[2]);
     return new RgbImage(64, 64, px);
   }
 
-  private static void paint(int[] px, int firstColumn, int count) {
+  private static void paint(int[] px, int firstRow, int firstColumn, int count) {
     for (int i = 0; i < count; i++) {
-      px[(i / 21) * 64 + firstColumn + (i % 21)] = RgbImage.pack(30, 160, 30);
+      px[(firstRow + i / 21) * 64 + firstColumn + (i % 21)] = RgbImage.pack(30, 160, 30);
     }
   }
 

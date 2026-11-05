@@ -151,4 +151,50 @@ class VisionTest {
     assertEquals(Vision.Steering.STRAIGHT, Vision.steer(new Vision.SectorCounts(0, 21, 10)));
     assertEquals(Vision.Steering.STRAIGHT, Vision.steer(new Vision.SectorCounts(10, 21, 0)));
   }
+
+  /** A 64x64 frame with green filling the given rectangle (inclusive). */
+  private static RgbImage frameWith(int[]... rects) {
+    int[] px = new int[64 * 64];
+    java.util.Arrays.fill(px, RgbImage.pack(190, 150, 110));
+    for (int[] r : rects) {
+      for (int y = r[1]; y <= r[3]; y++) {
+        for (int x = r[0]; x <= r[2]; x++) {
+          px[y * 64 + x] = RgbImage.pack(30, 160, 30);
+        }
+      }
+    }
+    return new RgbImage(64, 64, px);
+  }
+
+  @Test
+  void blobsSplitJarsThatDontTouch() {
+    java.util.List<Vision.Blob> blobs = Vision.blobs(frameWith(new int[] {5, 40, 10, 50},
+        new int[] {30, 38, 33, 44}));
+    assertEquals(2, blobs.size());
+    assertEquals(5, blobs.get(0).fromColumn);
+    assertEquals(10, blobs.get(0).toColumn);
+    assertEquals(50, blobs.get(0).lowestRow);
+    assertEquals(6 * 11, blobs.get(0).pixels);
+    assertEquals(31.5, blobs.get(1).centreColumn(), 1e-9);
+    assertEquals(50, Vision.lowestGreenRow(frameWith(new int[] {5, 40, 10, 50}, new int[] {30, 38, 33, 44})));
+    assertEquals(-1, Vision.lowestGreenRow(frameWith()));
+  }
+
+  @Test
+  void distanceFromTheLowestRowMatchesTheWebotsCalibration() {
+    // Jar straight ahead in Webots: robot-to-jar distance and the lowest green row seen.
+    int[][] measured = {{64, 60}, {74, 55}, {84, 51}, {94, 49}, {104, 47}, {114, 45}, {124, 44}};
+    for (int[] m : measured) {
+      assertEquals(m[0], Vision.distanceCm(m[1]), 7, "row " + m[1]);
+    }
+    assertEquals(Double.POSITIVE_INFINITY, Vision.distanceCm(31));
+    assertEquals(Double.POSITIVE_INFINITY, Vision.distanceCm(-1));
+  }
+
+  @Test
+  void bearingOffsetIsPositiveToTheLeftAndZeroInTheMiddle() {
+    assertEquals(0, Vision.bearingOffsetDeg(31.5), 1e-9);
+    assertTrue(Vision.bearingOffsetDeg(0) > 21 && Vision.bearingOffsetDeg(0) < 23);
+    assertEquals(-Vision.bearingOffsetDeg(0), Vision.bearingOffsetDeg(63), 1e-9);
+  }
 }
