@@ -85,13 +85,36 @@ jobs:
             libxcb-render0 libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-xfixes0 \
             libxcb-xinerama0 libxcb-xinput0 libxcb-cursor0
 
+      # Webots fetches the world's protos and textures from raw.githubusercontent.com and caches
+      # them. From the runners those downloads fail ("Connection closed"), and the run spent its
+      # whole 45 minutes retrying them, so fill the cache from the release's assets archive.
+      - name: Cache Webots assets
+        id: webots-assets-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cyberbotics/Webots/assets
+          key: webots-assets-R2025a
+
+      - name: Download Webots assets
+        if: steps.webots-assets-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL --retry 3 -o /tmp/assets.zip \
+            https://github.com/cyberbotics/webots/releases/download/R2025a/assets-R2025a.zip
+          mkdir -p ~/.cache/Cyberbotics/Webots/assets
+          unzip -q /tmp/assets.zip -d ~/.cache/Cyberbotics/Webots/assets
+          rm /tmp/assets.zip
+
       - name: Webots starts
         run: |
           LD_LIBRARY_PATH=~/webots/lib/webots ldd ~/webots/bin/webots-bin | { ! grep 'not found'; }
           xvfb-run -a ~/webots/webots --version
 
       - name: Run v2's whole mission in Webots
+        timeout-minutes: 25
         run: WEBOTS_HOME=~/webots tools/run-in-webots.sh --limit 1500 --out build/ci-webots v2
+
+      - name: Nothing had to be downloaded
+        run: "! grep -E 'Cannot download|Error downloading' build/ci-webots/v2/webots.log"
 
       - name: Every jar was delivered
         run: |
