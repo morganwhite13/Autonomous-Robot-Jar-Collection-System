@@ -13,15 +13,13 @@ public class Recorder {
     double period = Double.parseDouble(args[1]);
     Robot robot = new Robot();
     int timeStep = (int) Math.round(robot.getBasicTimeStep());
+    // Render only when a frame is due: rendering 640x400 every step slowed runs about tenfold.
+    int periodMs = Math.max(1, (int) Math.round(period * 1000 / timeStep)) * timeStep;
     Camera camera = robot.getCamera("arena camera");
-    camera.enable(timeStep);
-    double next = 0;
+    camera.enable(periodMs);
     int frame = 0;
-    while (robot.step(timeStep) != -1) {
-      if (robot.getTime() >= next) {
-        camera.saveImage(String.format("%s/frame%05d.png", out, frame++), 90);
-        next += period;
-      }
+    while (robot.step(periodMs) != -1) {
+      camera.saveImage(String.format("%s/frame%05d.png", out, frame++), 90);
     }
   }
 }
