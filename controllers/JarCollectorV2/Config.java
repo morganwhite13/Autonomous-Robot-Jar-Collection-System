@@ -19,12 +19,11 @@ final class Config {
   /** new: seed for the random wander so runs are repeatable (v1 used unseeded Math.random()). */
   static final long RANDOM_SEED = 2025L;
   /**
-   * new, off by default: carry and return along the shorter A*-planned routes
-   * ({@link Routes#PLANNED}) instead of v1's hand-tuned ones. In Webots this delivered all five
-   * jars in 788 s instead of 879 s (tools/run-in-webots.sh v2-planned). Off by default so that v2
-   * keeps every one of v1's waypoints.
+   * new: carry and return along the shorter A*-planned routes ({@link Routes#PLANNED}) instead
+   * of v1's hand-tuned ones. On six shuffled Webots worlds the median mission took 740 s instead
+   * of 837 s. Set to false for v1's waypoints (tools/run-in-webots.sh v2-hand-tuned).
    */
-  static final boolean USE_PLANNED_ROUTES = false;
+  static final boolean USE_PLANNED_ROUTES = true;
   /** v1 printed front-sonar readings 10 times at start-up; v2 prints one line. */
   static final boolean PRINT_SENSOR_SELF_TEST = true;
   static final int SENSOR_SELF_TEST_STEPS = 10;
@@ -158,12 +157,13 @@ final class Config {
 
   // ------------------------------------------------------------------ sonar watch (new)
   /**
-   * new, off by default: on travel legs (not the box-clearing route, which has to push boxes,
-   * and not placement), slow down for anything the two front sonars see before the waypoint, and
-   * stop short of it instead of driving into it. v1 printed the sonars once and never used them.
-   * Off until it has been tuned in Webots.
+   * new: on travel legs (not the box-clearing route, which has to push boxes, and not
+   * placement), slow down for anything the two front sonars see before the waypoint, and stop
+   * short of it instead of driving into it. v1 printed the sonars once and never used them. In
+   * Webots it never stopped for nothing on six shuffled worlds (the runs matched the ones without
+   * it), and with a wooden box on the carry route it stopped 24 cm short and drove around it.
    */
-  static final boolean SONAR_WATCH = false;
+  static final boolean SONAR_WATCH = true;
   /** new: start slowing down when an echo is this close (cm from the sonars). */
   static final double SONAR_SLOW_CM = 100;
   /** new: stop and skip to the next waypoint when an echo is this close. */
@@ -175,13 +175,12 @@ final class Config {
 
   // ------------------------------------------------------------------ grab check (new)
   /**
-   * new, off by default: after lifting, check that the fingers are squeezing something and
-   * release and try again if not. v1 printed "Verifying grab..." but checked nothing, so a jar
-   * that slipped out was "delivered" anyway. Every grab logs its grip effort either way: in
-   * Webots, real grabs measured 1.00 and a jar thrown out of the gripper dropped it to 0. Off by
-   * default because no real grab has missed yet, so it has never had to act.
+   * new: after lifting, check that the fingers are squeezing something and release and try
+   * again if not. v1 printed "Verifying grab..." but checked nothing, so a jar that slipped out
+   * was "delivered" anyway. In Webots, real grabs measured 1.00 and a jar thrown out of the
+   * gripper dropped it to 0; on six shuffled worlds the check never rejected a real grab.
    */
-  static final boolean VERIFY_GRABS = false;
+  static final boolean VERIFY_GRABS = true;
   /**
    * new: grip effort (finger motor force as a fraction of its maximum) that counts as holding a
    * jar. Fingers closing on a jar stop against it and push at their limit (about 1); fingers that

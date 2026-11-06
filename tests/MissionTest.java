@@ -56,7 +56,7 @@ class MissionTest {
   }
 
   @Test
-  void optInPlannedRoutesAlsoDeliverAllJarsAndFinishSooner() {
+  void plannedRoutesDeliverAllJarsSoonerThanV1sHandTunedOnes() {
     KinematicRobot handTuned = robotWithJars();
     assertEquals(5, new Mission(handTuned, Routes.HAND_TUNED).run());
     KinematicRobot planned = robotWithJars();
@@ -193,7 +193,7 @@ class MissionTest {
     // fingers hold nothing (v1, and v2 before the watch, counted that jar as delivered).
     KinematicRobot robot = robotWithJars();
     robot.grabsThatMiss = 1;
-    Mission mission = new Mission(robot);
+    Mission mission = new Mission(robot, new Mission.Options().verifyGrabs(false));
     assertEquals(5, mission.run());
     assertEquals(5, robot.deliveredJars.size()); // all actually on the pads
     assertEquals(List.of(), robot.jars);
@@ -228,7 +228,7 @@ class MissionTest {
   @Test
   void sonarWatchChangesNothingOnAClearCourse() {
     KinematicRobot off = robotWithJars();
-    new Mission(off).run();
+    new Mission(off, new Mission.Options().sonarWatch(false)).run();
     KinematicRobot on = robotWithJars();
     Mission watched = new Mission(on, new Mission.Options().sonarWatch(true));
     assertEquals(5, watched.run());
@@ -241,7 +241,8 @@ class MissionTest {
     StringBuilder plain = new StringBuilder();
     Log.useSink(line -> plain.append(line).append('\n'));
     assertThrows(RobotPlatform.SimulationEnded.class,
-        () -> new Mission(robotWithJars().withStepLimit(200), Routes.HAND_TUNED).run());
+        () -> new Mission(robotWithJars().withStepLimit(200), new Mission.Options()
+            .routes(Routes.HAND_TUNED).verifyGrabs(false).sonarWatch(false)).run());
     StringBuilder all = new StringBuilder();
     Log.useSink(line -> all.append(line).append('\n'));
     assertThrows(RobotPlatform.SimulationEnded.class,

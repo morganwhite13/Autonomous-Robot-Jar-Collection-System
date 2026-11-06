@@ -346,7 +346,7 @@ class JarHandlerTest {
     assertEquals(Config.RELEASE_STEPS, stillSteps);
   }
 
-  // Grab check (Config.VERIFY_GRABS, off by default).
+  // Grab check (Config.VERIFY_GRABS, on by default).
 
   private static JarHandler checkingHandler(RobotPlatform robot, MissionStats stats) {
     return new JarHandler(robot, new Navigator(robot, stats), stats, new Random(1), true);
@@ -382,7 +382,10 @@ class JarHandlerTest {
     KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
     robot.jars.add(Vec2.of(60, 0));
     robot.grabsThatMiss = 1;
-    assertTrue(handler(robot).searchAndGrab()); // the default, like v1
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    JarHandler unchecked = new JarHandler(robot, new Navigator(robot, stats), stats,
+        new Random(1), false);
+    assertTrue(unchecked.searchAndGrab()); // like v1
     assertNull(robot.heldJar);
   }
 

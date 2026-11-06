@@ -208,7 +208,7 @@ class NavigatorTest {
     assertTrue(robot.isStopped());
   }
 
-  // Sonar watch (Config.SONAR_WATCH, off by default) and the model's sonar.
+  // Sonar watch (Config.SONAR_WATCH, on by default for travel legs) and the model's sonar.
 
   @Test
   void sonarWatchStopsShortOfABoxInTheWay() {

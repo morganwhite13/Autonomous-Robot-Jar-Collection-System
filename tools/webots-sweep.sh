@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
     --publish) PUBLISH=1; shift ;;
     --set) SETS="$SETS --set $2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
-    v1|v2|v2-planned) VERSIONS+=("$1"); shift ;;
+    v1|v2|v2-hand-tuned) VERSIONS+=("$1"); shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done

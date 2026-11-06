@@ -3,8 +3,9 @@
 #
 #   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh            # both versions
 #   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh v2         # just one
-#   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh v1 v2 v2-planned
-#                       # v2-planned: v2 with Config.USE_PLANNED_ROUTES switched on (A* routes)
+#   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh v1 v2 v2-hand-tuned
+#                       # v2-hand-tuned: v2 on v1's carry and return waypoints
+#                       # (Config.USE_PLANNED_ROUTES switched off)
 #   tools/run-in-webots.sh --dry-run                                # build everything, don't launch
 #   WEBOTS_HOME=/usr/local/webots tools/run-in-webots.sh --watch v2 # watch it in real time
 #
@@ -18,7 +19,7 @@
 #          --port N        Webots' controller port (default 1234). Give each copy its own when
 #                          running several at once (tools/webots-sweep.sh does)
 #          --set NAME=VAL  change one of v2's Config constants for these runs, e.g.
-#                          --set SONAR_WATCH=true (repeatable; the source isn't modified)
+#                          --set SONAR_WATCH=false (repeatable; the source isn't modified)
 #          --frames S      also save a top-down picture of the arena every S simulated seconds to
 #                          build/webots-run/<version>/frames/ (tools/make-demo-gif.sh turns them
 #                          into a GIF); slows the run down
@@ -54,7 +55,7 @@ while [ $# -gt 0 ]; do
     --frames) FRAMES="$2"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --watch) WATCH=1; shift ;;
-    v1|v2|v2-planned) VERSIONS+=("$1"); shift ;;
+    v1|v2|v2-hand-tuned) VERSIONS+=("$1"); shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -108,7 +109,7 @@ javac --release 11 -nowarn -d "$TOOLS" controllers/JarCollectorV2/{Vec2,Angles,R
 for version in "${VERSIONS[@]}"; do
   case "$version" in
     v1) controller=ProjectController3; world=ProjectWorld2025.wbt ;;
-    v2|v2-planned) controller=JarCollectorV2; world=ProjectWorld2025_v2.wbt ;;
+    v2|v2-hand-tuned) controller=JarCollectorV2; world=ProjectWorld2025_v2.wbt ;;
   esac
   dir="$RUN_ROOT/$version"
   echo "==> Preparing $version in $dir"
@@ -118,7 +119,7 @@ for version in "${VERSIONS[@]}"; do
   cp -R "controllers/$controller" "$dir/controllers/"
   config="$dir/controllers/$controller/Config.java"
   overrides=("${SETTINGS[@]}")
-  [ "$version" = v2-planned ] && overrides+=(USE_PLANNED_ROUTES=true)
+  [ "$version" = v2-hand-tuned ] && overrides+=(USE_PLANNED_ROUTES=false)
   if [ "$controller" = JarCollectorV2 ]; then
     for setting in "${overrides[@]}"; do
       name=${setting%%=*}
@@ -232,7 +233,7 @@ if ran v1 && ran v2 && [ -f "$RUN_ROOT/paths.svg" ] && [ "$SEED" = 0 ] \
     echo
     cat "$RUN_ROOT/report.md"
     echo
-    echo "![Paths driven in Webots: v1 orange, v2 blue, v2-planned (if run) green](images/webots-paths.svg)"
+    echo "![Paths driven in Webots: v1 orange, v2 blue, v2-hand-tuned (if run) green](images/webots-paths.svg)"
   } > docs/webots-results.md
   cp "$RUN_ROOT/paths.svg" docs/images/webots-paths.svg
   echo "==> Updated docs/webots-results.md and docs/images/webots-paths.svg"

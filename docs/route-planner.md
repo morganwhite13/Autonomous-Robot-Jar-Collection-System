@@ -19,10 +19,10 @@ Here the 15 cardboard boxes that the clearing route passes within 40 cm of are t
 
 The last column treats every cardboard box as gone, so it's a lower bound.
 
-**What it means:** the hand-tuned routes are about 14% longer than the planned ones. Over a mission (5 carries, 4 returns) the planned routes would save about 30 m, or roughly 61 s of driving at full speed. Turns aren't counted, but both kinds of route have a similar number of legs. The saving also assumes the swept boxes really end up clear of the planned line, which only a Webots run can confirm. So this is a candidate for a future version, not a change to v2's default.
+**What it means:** the hand-tuned routes are about 14% longer than the planned ones. Over a mission (5 carries, 4 returns) the planned routes would save about 30 m, or roughly 61 s of driving at full speed. Turns aren't counted, but both kinds of route have a similar number of legs. The saving also assumes the swept boxes really end up clear of the planned line. Webots confirmed it: on six shuffled worlds the median mission took 740 s on the planned routes and 837 s on the hand-tuned ones ([`webots-sweep.md`](webots-sweep.md)).
 
-## Trying it
+## In v2
 
-v2 includes these routes as an option, off by default: `Config.USE_PLANNED_ROUTES` (`Routes.PLANNED`). The stored carry route leaves the jar bay through (850, 100) like the hand-tuned one; the stored routes are 20.5 m (carry) and 20.2 m (return) long. To compare it with the default in Webots, run `tools/run-in-webots.sh v2 v2-planned`.
+v2 carries and returns on these routes by default (`Config.USE_PLANNED_ROUTES`, `Routes.PLANNED`). The stored carry route leaves the jar bay through (850, 100) like the hand-tuned one; the stored routes are 20.5 m (carry) and 20.2 m (return) long. To compare them with v1's waypoints in Webots, run `tools/run-in-webots.sh v2 v2-hand-tuned`.
 
 ![Map comparing the hand-tuned carry route with the shorter A* route after clearing](images/route-planner.svg)

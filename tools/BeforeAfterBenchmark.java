@@ -245,10 +245,10 @@ public class BeforeAfterBenchmark {
     row(md, "30 cm box in the middle of a straight 3 m leg",
         "hits it at " + f0(r1.firstContactSpeedCmS) + " cm/s"
             + (v1Steps < 0 ? " and keeps pushing (still at 20,000 steps)" : ""),
-        "default: hits it at " + f0(r2.firstContactSpeedCmS) + " cm/s, "
+        "without the sonar watch: hits it at " + f0(r2.firstContactSpeedCmS) + " cm/s, "
             + plain.name().toLowerCase(Locale.ROOT).replace('_', ' ') + " after "
-            + f1(r2.elapsedMs() / 1000.0) + " s; with the sonar watch on (`Config.SONAR_WATCH`, "
-            + "off by default): " + (Double.isNaN(r3.firstContactSpeedCmS) ? "never touches it, "
+            + f1(r2.elapsedMs() / 1000.0) + " s; with it (`Config.SONAR_WATCH`, on by default "
+            + "for travel legs): " + (Double.isNaN(r3.firstContactSpeedCmS) ? "never touches it, "
             : "touches it, ") + "stops " + f0(gap) + " cm short ("
             + watched.name().toLowerCase(Locale.ROOT).replace('_', ' ') + ") after "
             + f1(r3.elapsedMs() / 1000.0) + " s");
@@ -285,7 +285,7 @@ public class BeforeAfterBenchmark {
     row(md, "A jar slips out of the gripper on the first grab",
         (v1Says ? "reports success" : "reports failure") + ", "
             + (r1.heldJar == null ? "holding nothing" : "holding the jar"),
-        "with the grab check on (`Config.VERIFY_GRABS`, off by default): "
+        "with the grab check (`Config.VERIFY_GRABS`, on by default): "
             + (v2Says ? "reports success" : "reports failure") + ", "
             + (r2.heldJar == null ? "holding nothing" : "holding the jar") + " after "
             + (stats.missedGrabs() + 1) + " grabs");
@@ -316,10 +316,11 @@ public class BeforeAfterBenchmark {
         delivered + "/5 jars, " + f0(robot.elapsedMs() / 1000.0) + " s simulated, "
             + s.driveStalls() + " stalls, " + s.turnTimeouts() + " turn timeouts");
 
-    KinematicRobot plannedRobot = missionRobot(world);
-    int plannedDelivered = new Mission(plannedRobot, Routes.PLANNED).run();
-    row(md, "Whole mission with v2's opt-in A*-planned routes (`Config.USE_PLANNED_ROUTES`)", "-",
-        plannedDelivered + "/5 jars, " + f0(plannedRobot.elapsedMs() / 1000.0) + " s simulated");
+    KinematicRobot handTunedRobot = missionRobot(world);
+    int handTunedDelivered = new Mission(handTunedRobot, Routes.HAND_TUNED).run();
+    row(md, "Whole mission on v1's hand-tuned carry and return routes "
+        + "(`Config.USE_PLANNED_ROUTES = false`)", "-",
+        handTunedDelivered + "/5 jars, " + f0(handTunedRobot.elapsedMs() / 1000.0) + " s simulated");
 
     KinematicRobot empty = new KinematicRobot(Vec2.of(850, 60), 270).withStepLimit(400_000);
     Mission noJars = new Mission(empty);

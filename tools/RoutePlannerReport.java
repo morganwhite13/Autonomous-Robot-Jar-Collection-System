@@ -78,19 +78,20 @@ public class RoutePlannerReport {
         .append("save about ").append(f0(savedCm / 100)).append(" m, or roughly ")
         .append(f0(savedCm / DRIVE_CM_PER_S)).append(" s of driving at full speed. Turns aren't ")
         .append("counted, but both kinds of route have a similar number of legs. The saving ")
-        .append("also assumes the swept boxes really end up clear of the planned line, which ")
-        .append("only a Webots run can confirm. So this is a candidate for a future version, ")
-        .append("not a change to v2's default.\n\n");
-    md.append("## Trying it\n\n");
-    md.append("v2 includes these routes as an option, off by default: `Config.USE_PLANNED_ROUTES` ")
-        .append("(`Routes.PLANNED`). The stored carry route leaves the jar bay through (850, 100) ")
+        .append("also assumes the swept boxes really end up clear of the planned line. Webots ")
+        .append("confirmed it: on six shuffled worlds the median mission took 740 s on the ")
+        .append("planned routes and 837 s on the hand-tuned ones ([`webots-sweep.md`](webots-sweep.md)).")
+        .append("\n\n");
+    md.append("## In v2\n\n");
+    md.append("v2 carries and returns on these routes by default (`Config.USE_PLANNED_ROUTES`, ")
+        .append("`Routes.PLANNED`). The stored carry route leaves the jar bay through (850, 100) ")
         .append("like the hand-tuned one; the stored routes are ")
         .append(String.format(Locale.ROOT, "%.1f m (carry) and %.1f m (return)",
             Routes.length(search, Routes.PLANNED_SEARCH_TO_DROPOFF) / 100,
             Routes.length(dropoff, Routes.PLANNED_DROPOFF_TO_SEARCH.subList(1,
                 Routes.PLANNED_DROPOFF_TO_SEARCH.size())) / 100))
-        .append(" long. To compare it with the default in Webots, run ")
-        .append("`tools/run-in-webots.sh v2 v2-planned`.\n\n");
+        .append(" long. To compare them with v1's waypoints in Webots, run ")
+        .append("`tools/run-in-webots.sh v2 v2-hand-tuned`.\n\n");
     md.append("![Map comparing the hand-tuned carry route with the shorter A* route after clearing]")
         .append("(images/route-planner.svg)\n");
     Files.write(Path.of(args[1]), md.toString().getBytes(StandardCharsets.UTF_8));
