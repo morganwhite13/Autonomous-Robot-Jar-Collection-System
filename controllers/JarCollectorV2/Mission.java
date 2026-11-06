@@ -1,0 +1,198 @@
+import java.util.List;
+import java.util.Locale;
+import java.util.Random;
+
+/**
+ * The mission as an explicit sequence: start-up, clear boxes, then for each jar
+ * travel to search point, search and grab, carry to drop-off, place.
+ *
+ * <p>Fix vs v1: v1 picked the route to the search point with {@code if (jarsToGo == 5)}, so after
+ * a failed search for jars 2-5 it used the drop-off route even though the robot was still at the
+ * search point. That route's first leg is a straight line from the jar bay to the drop-off,
+ * diagonally across the arena through the static wooden boxes. v2 tracks where the robot is.
+ * v1 also retried failed searches forever; v2 stops after
+ * {@link Config#MAX_CONSECUTIVE_FAILED_SEARCHES} and reports what it achieved.
+ */
+final class Mission {
+
+  static final String PHASE_STARTUP = "Start-up";
+  static final String PHASE_CLEARING = "Clearing path";
+  static final String PHASE_TO_SEARCH = "Travel to search point";
+  static final String PHASE_SEARCH = "Search and grab";
+  static final String PHASE_TO_DROPOFF = "Carry to drop-off";
+  static final String PHASE_PLACE = "Place jar";
+
+  private final RobotPlatform robot;
+  private final MissionStats stats;
+  private final Navigator nav;
+  private final JarHandler jars;
+
+  private final Routes.RouteSet routes;
+
+  /** v2's optional behaviours. Each starts at its switch in {@link Config}. */
+  static final class Options {
+    Routes.RouteSet routes = Config.USE_PLANNED_ROUTES ? Routes.PLANNED : Routes.HAND_TUNED;
+    boolean verifyGrabs = Config.VERIFY_GRABS;
+    boolean sonarWatch = Config.SONAR_WATCH;
+
+    Options routes(Routes.RouteSet set) {
+      routes = set;
+      return this;
+    }
+
+    Options verifyGrabs(boolean on) {
+      verifyGrabs = on;
+      return this;
+    }
+
+    Options sonarWatch(boolean on) {
+      sonarWatch = on;
+      return this;
+    }
+  }
+
+  private final Options options;
+
+  Mission(RobotPlatform robot) {
+    this(robot, new Options());
+  }
+
+  Mission(RobotPlatform robot, Routes.RouteSet routes) {
+    this(robot, new Options().routes(routes));
+  }
+
+  Mission(RobotPlatform robot, Options options) {
+    this.robot = robot;
+    this.options = options;
+    this.routes = options.routes;
+    this.stats = new MissionStats(robot::elapsedMs);
+    this.nav = new Navigator(robot, stats);
+    this.jars = new JarHandler(robot, nav, stats, new Random(Config.RANDOM_SEED),
+        options.verifyGrabs);
+  }
+
+  MissionStats stats() {
+    return stats;
+  }
+
+  /** Runs the whole mission and returns the number of jars delivered. */
+  int run() {
+    startUp();
+    if (routes != Routes.HAND_TUNED) {
+      Log.info("Using the " + routes.name + " carry and return routes");
+    }
+    if (options.verifyGrabs) {
+      Log.info("Grab check on: a grab that isn't holding anything is retried");
+    }
+    if (options.sonarWatch) {
+      Log.info("Sonar watch on: travel legs stop short of obstacles in the way");
+    }
+    clearPath();
+
+    boolean atDropoff = false;
+    int delivered = 0;
+    int failedInARow = 0;
+    while (delivered < Config.JAR_COUNT) {
+      int jarNumber = delivered + 1;
+      Log.phase("COLLECTING JAR " + jarNumber + " of " + Config.JAR_COUNT);
+      stats.beginJar(jarNumber);
+      goToSearchPoint(atDropoff);
+      atDropoff = false;
+
+      if (!searchAndGrab()) {
+        failedInARow++;
+        Log.warn("search failed (" + failedInARow + " in a row)");
+        if (failedInARow >= Config.MAX_CONSECUTIVE_FAILED_SEARCHES) {
+          Log.warn("giving up after " + failedInARow + " failed searches");
+          break;
+        }
+        continue; // still near the search point, so the short route is used next time
+      }
+      failedInARow = 0;
+
+      if (!deliver(delivered)) {
+        continue; // dropped on the way: back at the search point for another try
+      }
+      atDropoff = true;
+      delivered++;
+      Log.info("Jars remaining: " + (Config.JAR_COUNT - delivered));
+    }
+
+    finish(delivered);
+    return delivered;
+  }
+
+  private void clearPath() {
+    Log.phase("PHASE 1: Clearing path");
+    stats.beginPhase(PHASE_CLEARING);
+    nav.followRoute(Routes.CLEARING_PATH);
+  }
+
+  /** From the start (or after a failed search) the short route; from the drop-off the long one. */
+  private void goToSearchPoint(boolean fromDropoff) {
+    stats.beginPhase(PHASE_TO_SEARCH);
+    List<Vec2> route = fromDropoff ? routes.dropoffToSearch : Routes.TO_SEARCH_POINT;
+    nav.drive(route, new Navigator.Travel().watchAhead(options.sonarWatch).detours(true));
+  }
+
+  private boolean searchAndGrab() {
+    stats.beginPhase(PHASE_SEARCH);
+    if (jars.searchAndGrab()) {
+      return true;
+    }
+    stats.recordFailedSearch();
+    return false;
+  }
+
+  /**
+   * Carries the held jar to the drop-off and places it in slot {@code jarIndex}. If the jar falls
+   * out on the way, goes back to the search point instead and returns false.
+   */
+  private boolean deliver(int jarIndex) {
+    stats.beginPhase(PHASE_TO_DROPOFF);
+    JarHandler.GripWatch holding = jars.gripWatch();
+    Navigator.Travel carry = new Navigator.Travel().watchAhead(options.sonarWatch)
+        .turnSpeed(Config.CARRY_TURN_SPEED).detours(true).keepGoingWhile(holding);
+    boolean delivered = nav.drive(routes.searchToDropoff, carry) != Navigator.RouteResult.ABORTED;
+    if (delivered) {
+      stats.beginPhase(PHASE_PLACE);
+      delivered = jars.place(jarIndex, holding);
+    }
+    if (!Double.isNaN(holding.lowest())) {
+      Log.info(String.format(Locale.ROOT, "Lowest grip effort while carrying: %.2f",
+          holding.lowest()));
+    }
+    if (!delivered) {
+      stats.recordDroppedJar();
+      Log.warn("the jar fell out of the gripper at " + robot.positionCm()
+          + "; going back to the search point");
+      robot.setFingers(Config.FINGERS_OPEN);
+      robot.setLift(Config.LIFT_DOWN);
+      stats.beginPhase(PHASE_TO_SEARCH);
+      nav.driveViaPlan(Routes.TO_SEARCH_POINT.get(0),
+          new Navigator.Travel().watchAhead(options.sonarWatch).detours(true));
+      return false;
+    }
+    stats.jarDelivered();
+    return true;
+  }
+
+  private void finish(int delivered) {
+    stats.endPhase();
+    Log.phase(delivered == Config.JAR_COUNT ? "ALL JARS COLLECTED!" : "MISSION INCOMPLETE");
+    Log.block(stats.report());
+  }
+
+  private void startUp() {
+    stats.beginPhase(PHASE_STARTUP);
+    Log.phase("Start-up: opening and lowering gripper");
+    robot.setFingers(Config.FINGERS_OPEN);
+    robot.setLift(Config.LIFT_DOWN);
+    int settleSteps = (int) Math.ceil((double) Config.STARTUP_SETTLE_MS / robot.timeStepMs());
+    robot.waitSteps(Math.max(1, settleSteps));
+    if (Config.PRINT_SENSOR_SELF_TEST) {
+      robot.waitSteps(Config.SENSOR_SELF_TEST_STEPS);
+      Log.info("Sensor self-test: " + robot.diagnostics());
+    }
+  }
+}

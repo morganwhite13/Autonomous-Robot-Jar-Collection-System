@@ -1,0 +1,11 @@
+# Compiled controllers. Build them from source (tools/build-controllers.sh or Webots' Build
+# button). Webots runs whatever .class it finds and never rebuilds it by itself, so a committed
+# .class goes stale (the one previously committed here was built from an older version).
+*.class
+
+# Output of tools/run-tests.sh (JUnit jar, compiled classes)
+build/
+
+# Files Webots writes next to a world when it is opened
+worlds/.*.wbproj
+worlds/.*.jpg
