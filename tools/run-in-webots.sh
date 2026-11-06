@@ -191,7 +191,12 @@ WORLD
   fi
   echo "==> Running $version (simulated-time limit ${LIMIT} s); log: $dir/webots.log"
   start=$(date +%s)
-  "${cmd[@]}" > "$dir/webots.log" 2>&1 || echo "    Webots exited with status $?"
+  status=0
+  "${cmd[@]}" > "$dir/webots.log" 2>&1 || status=$?
+  if [ "$status" -ne 0 ]; then
+    echo "    Webots exited with status $status; the end of its log:"
+    tail -n 15 "$dir/webots.log" | sed 's/^/      /'
+  fi
   echo "    finished in $(( $(date +%s) - start )) s of wall time"
   if [ -f "$dir/result.properties" ]; then
     sed 's/^/    /' "$dir/result.properties"

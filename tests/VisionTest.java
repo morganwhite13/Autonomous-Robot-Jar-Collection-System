@@ -174,7 +174,6 @@ class VisionTest {
     assertEquals(5, blobs.get(0).fromColumn);
     assertEquals(10, blobs.get(0).toColumn);
     assertEquals(50, blobs.get(0).lowestRow);
-    assertEquals(6 * 11, blobs.get(0).pixels);
     assertEquals(31.5, blobs.get(1).centreColumn(), 1e-9);
     assertEquals(50, Vision.lowestGreenRow(frameWith(new int[] {5, 40, 10, 50}, new int[] {30, 38, 33, 44})));
     assertEquals(-1, Vision.lowestGreenRow(frameWith()));

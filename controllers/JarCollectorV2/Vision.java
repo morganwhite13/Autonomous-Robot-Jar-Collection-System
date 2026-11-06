@@ -133,13 +133,11 @@ final class Vision {
     final int fromColumn;
     final int toColumn;
     final int lowestRow;
-    final int pixels;
 
-    Blob(int fromColumn, int toColumn, int lowestRow, int pixels) {
+    Blob(int fromColumn, int toColumn, int lowestRow) {
       this.fromColumn = fromColumn;
       this.toColumn = toColumn;
       this.lowestRow = lowestRow;
-      this.pixels = pixels;
     }
 
     double centreColumn() {
@@ -152,7 +150,6 @@ final class Vision {
     List<Blob> blobs = new ArrayList<>();
     int start = -1;
     int lowest = -1;
-    int pixels = 0;
     for (int x = 0; x <= image.width; x++) {
       int columnPixels = 0;
       int columnLowest = -1;
@@ -167,12 +164,10 @@ final class Vision {
           start = x;
         }
         lowest = Math.max(lowest, columnLowest);
-        pixels += columnPixels;
       } else if (start >= 0) {
-        blobs.add(new Blob(start, x - 1, lowest, pixels));
+        blobs.add(new Blob(start, x - 1, lowest));
         start = -1;
         lowest = -1;
-        pixels = 0;
       }
     }
     return blobs;
