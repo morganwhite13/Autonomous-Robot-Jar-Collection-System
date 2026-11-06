@@ -37,6 +37,10 @@ public class Observer {
       jarNodes.add(jar);
       jars.add(jar.getField("translation"));
     }
+    int[] upAxis = new int[jarNodes.size()];
+    for (int i = 0; i < jarNodes.size(); i++) {
+      upAxis[i] = upAxis(jarNodes.get(i).getOrientation());
+    }
     DeliveryTracker tracker = new DeliveryTracker(jars.size());
     System.out.println("[observer] watching " + jars.size() + " jars, limit " + limitS + " s");
 
@@ -83,7 +87,7 @@ public class Observer {
     }
     Files.write(outDir.resolve("result.properties"),
         tracker.toProperties(time, time >= limitS).getBytes(StandardCharsets.UTF_8));
-    writeFinalJarPositions(outDir.resolve("jars.csv"), jarNodes);
+    writeFinalJarPositions(outDir.resolve("jars.csv"), jarNodes, upAxis);
     System.out.printf(Locale.ROOT, "[observer] finished at %.1f s with %d/%d jars delivered%n",
         time, tracker.delivered(), jars.size());
     if (!ended) {
@@ -95,13 +99,16 @@ public class Observer {
    * Where each jar is when the run ends, and whether it is still standing: tells a jar the robot
    * never reached from one it knocked over or left somewhere awkward.
    */
-  private static void writeFinalJarPositions(Path file, List<Node> jars) throws IOException {
+  private static void writeFinalJarPositions(Path file, List<Node> jars, int[] upAxis)
+      throws IOException {
     List<String> lines = new ArrayList<>();
     lines.add("jar,x,y,upright");
     for (int i = 0; i < jars.size(); i++) {
       double[] p = jars.get(i).getPosition();
       double[] m = jars.get(i).getOrientation();
-      boolean upright = m[4] > 0.9; // the jar's own up axis still points (nearly) straight up
+      // The axis that pointed up at the start still points within 25 degrees of straight up.
+      int axis = Math.abs(upAxis[i]) - 1;
+      boolean upright = Math.signum(upAxis[i]) * m[3 + axis] > 0.9;
       lines.add(String.format(Locale.ROOT, "%d,%.1f,%.1f,%b", i, p[0] * 100, -p[2] * 100,
           upright));
       if (!upright) {
@@ -110,5 +117,20 @@ public class Observer {
       }
     }
     Files.write(file, lines, StandardCharsets.UTF_8);
+  }
+
+  /**
+   * Which of a node's own axes points up (world +Y), from its orientation matrix: 1, 2 or 3 for
+   * X, Y or Z, negative if that axis points down. The jars are rotated in the world, so their up
+   * axis isn't their Y.
+   */
+  static int upAxis(double[] m) {
+    int best = 0;
+    for (int k = 1; k < 3; k++) {
+      if (Math.abs(m[3 + k]) > Math.abs(m[3 + best])) {
+        best = k;
+      }
+    }
+    return (int) Math.signum(m[3 + best]) * (best + 1);
   }
 }
