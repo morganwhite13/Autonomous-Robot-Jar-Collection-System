@@ -197,4 +197,14 @@ class VisionTest {
     assertTrue(Vision.bearingOffsetDeg(0) > 21 && Vision.bearingOffsetDeg(0) < 23);
     assertEquals(-Vision.bearingOffsetDeg(0), Vision.bearingOffsetDeg(63), 1e-9);
   }
+
+  @Test
+  void leanPointsAtTheOuterThirdWithMoreGreen() {
+    assertEquals(Vision.Steering.RIGHT, Vision.lean(new Vision.SectorCounts(0, 5, 15)));
+    assertEquals(Vision.Steering.RIGHT, Vision.lean(new Vision.SectorCounts(4, 9, 5)));
+    assertEquals(Vision.Steering.LEFT, Vision.lean(new Vision.SectorCounts(15, 5, 0)));
+    assertEquals(Vision.Steering.LEFT, Vision.lean(new Vision.SectorCounts(5, 20, 4)));
+    assertEquals(Vision.Steering.STRAIGHT, Vision.lean(new Vision.SectorCounts(5, 5, 5)));
+    assertEquals(Vision.Steering.STRAIGHT, Vision.lean(new Vision.SectorCounts(0, 20, 0)));
+  }
 }

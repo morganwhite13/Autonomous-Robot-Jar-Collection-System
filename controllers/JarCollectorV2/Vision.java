@@ -109,6 +109,20 @@ final class Vision {
     return Steering.UNCLEAR;
   }
 
+  /**
+   * new ({@link Config#STEER_WHEN_UNCLEAR}): which way the green leans when {@link #steer} can't
+   * decide: towards the outer third with more of it, or straight if they're level.
+   */
+  static Steering lean(SectorCounts c) {
+    if (c.right > c.left) {
+      return Steering.RIGHT;
+    }
+    if (c.left > c.right) {
+      return Steering.LEFT;
+    }
+    return Steering.STRAIGHT;
+  }
+
   /** v1 scan score: number of green pixels, +50 when the jar is in the centre third. */
   static int scanScore(SectorCounts c) {
     return c.total() + (c.dominant() == Sector.CENTER ? Config.SCAN_CENTER_BONUS : 0);

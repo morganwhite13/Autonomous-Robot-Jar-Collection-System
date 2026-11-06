@@ -84,6 +84,15 @@ final class Config {
   static final int STEER_MARGIN_PIXELS = 10;
   /** v1: drive straight if no sector clearly leads but at least this many green pixels show. */
   static final int STEER_STRAIGHT_MIN_PIXELS = 30;
+  /**
+   * new: when the jar is in sight but neither rule above applies, steer towards the outer third
+   * with more green (straight if they're level) instead of v1's stop-and-reassess. A small, far
+   * jar split across two thirds (say 5 px in the centre and 15 on the right) never looks any
+   * different while the robot stands still, so v1 stood there until the approach gave up. In
+   * Webots this stopped every approach to the last jar on one shuffled world. Set to false for
+   * v1 behaviour.
+   */
+  static final boolean STEER_WHEN_UNCLEAR = true;
 
   // ------------------------------------------------------------------ search (360-degree scan)
   /** v1: rotate at MAX_SPEED / 4 while scanning. */
@@ -244,4 +253,12 @@ final class Config {
   static final int JAR_MAP_MIN_SIGHTINGS = 2;
   /** new: after a grab, forget remembered jars this close to where the grabbed jar was. */
   static final double JAR_MAP_FORGET_CM = 30;
+  /**
+   * new: when something stops an approach before the jar (it isn't making progress) and the jar
+   * is on the map, drive around what stopped it (as for a stalled leg, {@link
+   * #DETOUR_AROUND_STALLS}) to this far from the jar and approach again from there. In Webots,
+   * on one shuffled world, approaches to the last jar from the search point were stopped dead
+   * again and again while a slightly different line got through. v1 had no jar map.
+   */
+  static final double APPROACH_AGAIN_FROM_CM = 80;
 }

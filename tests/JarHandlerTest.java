@@ -174,9 +174,9 @@ class JarHandlerTest {
   @Test
   void bumperPressedDuringTheReassessPauseStillGrabs() {
     ScriptedRobot robot = new ScriptedRobot();
-    robot.left = 5;
-    robot.center = 5;
-    robot.right = 5; // 15 px: visible, but no third leads, so the robot pauses to reassess
+    robot.left = 4;
+    robot.center = 4;
+    robot.right = 4; // 12 px: too few to count as seeing the jar, so the robot pauses to reassess
     robot.touchedAtStep = step -> step >= 3;
     MissionStats stats = new MissionStats(robot::elapsedMs);
     JarHandler handler = new JarHandler(robot, new Navigator(robot, stats), stats, new Random(1));
@@ -265,13 +265,63 @@ class JarHandlerTest {
     robot.center = 5;
     robot.right = 5; // never "lost", so the approach only ends when the robot isn't moving
     assertFalse(handler(robot).approachAndGrab());
-    int frames = Config.APPROACH_STALL_WINDOW_STEPS;
-    assertEquals(frames * (1 + Config.REASSESS_PAUSE_STEPS), robot.steps);
+    assertEquals(Config.APPROACH_STALL_WINDOW_STEPS, robot.steps);
+    assertTrue(robot.isStopped());
+  }
+
+  @Test
+  void fourteenPixelsCountAsLostAndPauseLikeV1() {
+    ScriptedRobot robot = new ScriptedRobot();
+    robot.left = 5;
+    robot.center = 5;
+    robot.right = 4;
+    assertFalse(handler(robot).approachAndGrab());
+    int pausedFrames = Config.APPROACH_MAX_STEPS_WITHOUT_JAR;
+    assertEquals(pausedFrames * (1 + Config.REASSESS_PAUSE_STEPS) + 1, robot.steps);
     // ...and the robot stood still during every reassess pause
     for (int step = 2; step <= 6; step++) {
       assertFalse(robot.movingDuring.get(step - 1), "moving during pause step " + step);
     }
     assertTrue(robot.isStopped());
+  }
+
+  /** The first wheel command of an approach that sees these counts all along. */
+  private static double[] firstCommandFor(int left, int center, int right) {
+    ScriptedRobot robot = new ScriptedRobot();
+    robot.left = left;
+    robot.center = center;
+    robot.right = right;
+    robot.firstRow = 60; // close enough to creep, not to hurry
+    robot.touchedAtStep = step -> step >= 2;
+    handler(robot).approachAndGrab();
+    return robot.commands.get(0);
+  }
+
+  @Test
+  void aJarInSightThatNoThirdClearlyHoldsIsSteeredTowardsInsteadOfWaitingFor() {
+    double s = Config.APPROACH_SPEED;
+    double[] towardsRight = {s * Config.APPROACH_OUTER_FACTOR, s * Config.APPROACH_INNER_FACTOR};
+    double[] towardsLeft = {s * Config.APPROACH_INNER_FACTOR, s * Config.APPROACH_OUTER_FACTOR};
+    // What Webots showed: a far jar 5 px in the centre third and 15 in the right one. v1 stood
+    // still to "reassess", saw the same picture, and stood still again until it gave up.
+    assertArrayEquals(towardsRight, firstCommandFor(0, 5, 15), 1e-12);
+    assertArrayEquals(towardsRight, firstCommandFor(0, 10, 10), 1e-12);
+    assertArrayEquals(towardsLeft, firstCommandFor(15, 5, 0), 1e-12);
+    assertArrayEquals(towardsLeft, firstCommandFor(6, 5, 5), 1e-12);
+    assertArrayEquals(new double[] {s, s}, firstCommandFor(5, 5, 5), 1e-12);
+  }
+
+  @Test
+  void aFarJarOnTheLineBetweenTwoThirdsIsReachedOnTheModel() {
+    // 2 m away, on the boundary between the centre and right thirds of the image.
+    KinematicRobot robot = new KinematicRobot(Vec2.of(0, 0), 0);
+    Vec2 jar = polar(200, Vision.bearingOffsetDeg(42));
+    robot.jars.add(jar);
+    Vision.SectorCounts first = Vision.countGreen(robot.captureImage());
+    assertEquals(Vision.Steering.UNCLEAR, Vision.steer(first), first.toString());
+    assertTrue(first.total() >= Config.APPROACH_LOST_PIXELS, first.toString());
+    assertTrue(handler(robot).approachAndGrab());
+    assertEquals(jar, robot.heldJar);
   }
 
   @Test
@@ -324,7 +374,7 @@ class JarHandlerTest {
   @Test
   void anUnclearViewStopsAMovingRobotBeforeThePause() {
     ScriptedRobot robot = new ScriptedRobot();
-    robot.sectorsAtStep = step -> step == 1 ? new int[] {40, 0, 0} : new int[] {5, 5, 5};
+    robot.sectorsAtStep = step -> step == 1 ? new int[] {40, 0, 0} : new int[] {4, 4, 4};
     robot.touchedAtStep = step -> step >= 4;
     assertTrue(handler(robot).approachAndGrab());
     assertTrue(robot.movingDuring.get(1), "steering left during step 2");
@@ -515,5 +565,49 @@ class JarHandlerTest {
     handler(right).approachAndGrab();
     assertArrayEquals(new double[] {s * Config.APPROACH_OUTER_FACTOR + boost,
         s * Config.APPROACH_INNER_FACTOR + boost}, right.commands.get(0), 1e-12);
+  }
+
+  /** The last jar seen from the search point with a small box on the straight line to it. */
+  private static KinematicRobot boxBetweenTheSearchPointAndAJar(double headingDeg)
+      throws Exception {
+    WorldFile world = WorldFile.read(java.nio.file.Path.of("worlds/ProjectWorld2025.wbt"));
+    KinematicRobot robot = new KinematicRobot(Routes.SEARCH_POINT, headingDeg)
+        .withStaticObstacles(world, KinematicRobot.ROBOT_RADIUS_CM)
+        .withBox(Vec2.of(870, 4), 12);
+    robot.jars.add(Vec2.of(900, -80));
+    return robot;
+  }
+
+  @Test
+  void anApproachStoppedBySomethingInTheWayGoesAroundItToTheJar() throws Exception {
+    KinematicRobot robot = boxBetweenTheSearchPointAndAJar(0);
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    JarHandler handler = new JarHandler(robot, new Navigator(robot, stats), stats, new Random(1));
+    assertTrue(handler.searchAndGrab());
+    assertEquals(Vec2.of(900, -80), robot.heldJar);
+    assertEquals(1, stats.detours());
+  }
+
+  @Test
+  void aRememberedJarBehindSomethingIsAlsoReachedAroundIt() throws Exception {
+    KinematicRobot robot = boxBetweenTheSearchPointAndAJar(0);
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    JarHandler handler = new JarHandler(robot, new Navigator(robot, stats), stats, new Random(1));
+    handler.scan(); // puts the jar on the map, as the previous search would have
+    assertEquals(1, handler.rememberedJars().size());
+    assertTrue(handler.searchAndGrab());
+    assertEquals(Vec2.of(900, -80), robot.heldJar);
+    assertEquals(1, stats.detours());
+  }
+
+  @Test
+  void withoutAMapEntryABlockedApproachIsNotRetriedAround() throws Exception {
+    KinematicRobot robot =
+        boxBetweenTheSearchPointAndAJar(Routes.SEARCH_POINT.bearingTo(Vec2.of(900, -80)));
+    MissionStats stats = new MissionStats(robot::elapsedMs);
+    JarHandler handler = new JarHandler(robot, new Navigator(robot, stats), stats, new Random(1));
+    assertFalse(handler.approachAndGrab()); // straight at it: stopped by the box
+    assertNull(robot.heldJar);
+    assertEquals(0, stats.detours());
   }
 }

@@ -134,8 +134,23 @@ final class Navigator {
    * no way round.
    */
   private DriveResult detour(Vec2 target, Travel travel, double blockerAheadCm) {
-    Vec2 stoppedAt = robot.positionCm();
-    Vec2[] blocker = squareAhead(stoppedAt, robot.headingDeg(), blockerAheadCm,
+    return goAround(target, robot.positionCm(), robot.headingDeg(), blockerAheadCm, travel);
+  }
+
+  /**
+   * Like a detour, for something that stopped the robot at {@code stoppedAt}, facing {@code
+   * headingDeg}, while it was doing something other than following a route (approaching a jar).
+   * Backs off, then drives to {@code target} around a {@link Config#DETOUR_BLOCKER_SIZE_CM}
+   * square {@link Config#DETOUR_BLOCKER_AHEAD_CM} ahead of that pose; {@code travel}'s condition
+   * can end the drive early. STALLED if there's no way round.
+   */
+  DriveResult goAround(Vec2 target, Vec2 stoppedAt, double headingDeg, Travel travel) {
+    return goAround(target, stoppedAt, headingDeg, Config.DETOUR_BLOCKER_AHEAD_CM, travel);
+  }
+
+  private DriveResult goAround(Vec2 target, Vec2 stoppedAt, double headingDeg,
+      double blockerAheadCm, Travel travel) {
+    Vec2[] blocker = squareAhead(stoppedAt, headingDeg, blockerAheadCm,
         Config.DETOUR_BLOCKER_SIZE_CM);
     driveSteps(-Config.MANOEUVRE_SPEED, Config.DETOUR_BACKUP_STEPS);
     List<Vec2> legs = plannedLegs(ArenaMap.planner(List.<Vec2[]>of(blocker)), target);

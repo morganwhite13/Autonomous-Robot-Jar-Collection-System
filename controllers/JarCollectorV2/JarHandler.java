@@ -43,6 +43,9 @@ final class JarHandler {
   private final boolean verifyGrabs;
   /** Where jars were seen in the last full scan and haven't been picked up since. */
   private final List<Vec2> rememberedJars = new ArrayList<>();
+  /** Where the last approach was stopped before reaching the jar, and its heading; or null. */
+  private Vec2 blockedAt;
+  private double blockedHeadingDeg;
 
   JarHandler(RobotPlatform robot, Navigator nav, MissionStats stats, Random random) {
     this(robot, nav, stats, random, Config.VERIFY_GRABS);
@@ -75,7 +78,7 @@ final class JarHandler {
           best.headingDeg, best.counts.total(), best.counts, best.counts.dominant()));
       nav.turnTo(best.headingDeg, Config.MANOEUVRE_SPEED);
       stats.recordApproach();
-      if (approachAndGrab()) {
+      if (approachAndGrab() || approachAgainAround(rememberedJarTowards(best.headingDeg))) {
         forgetGrabbedJar();
         return true;
       }
@@ -104,7 +107,7 @@ final class JarHandler {
       Vision.SectorCounts counts = Vision.countGreen(robot.captureImage());
       if (counts.total() > Config.SCAN_MIN_GREEN_PIXELS) {
         stats.recordApproach();
-        if (approachAndGrab()) {
+        if (approachAndGrab() || approachAgainAround(target)) {
           forgetGrabbedJar();
           return true;
         }
@@ -125,6 +128,43 @@ final class JarHandler {
     double reach = Config.CAMERA_AHEAD_CM + 2 * Config.JAR_RADIUS_CM + 7; // bumper to jar centre
     Vec2 held = Vec2.of(here.x + reach * Math.cos(h), here.y + reach * Math.sin(h));
     rememberedJars.removeIf(jar -> jar.distanceTo(held) <= Config.JAR_MAP_FORGET_CM);
+  }
+
+  /**
+   * After an approach that something stopped before the jar at {@code jar} (null: the jar isn't
+   * on the map, or the approach ended some other way): go around what stopped it, to {@link
+   * Config#APPROACH_AGAIN_FROM_CM} from the jar, and approach once more. True once it's held.
+   */
+  private boolean approachAgainAround(Vec2 jar) {
+    if (blockedAt == null || jar == null) {
+      return false;
+    }
+    Log.info("Something stopped the approach at " + blockedAt + "; going around it to the jar at "
+        + jar);
+    Navigator.DriveResult around = nav.goAround(jar, blockedAt, blockedHeadingDeg,
+        new Navigator.Travel().keepGoingWhile(
+            () -> robot.positionCm().distanceTo(jar) > Config.APPROACH_AGAIN_FROM_CM));
+    if (around != Navigator.DriveResult.ABORTED && around != Navigator.DriveResult.ARRIVED) {
+      return false;
+    }
+    nav.turnTo(robot.positionCm().bearingTo(jar), Config.MANOEUVRE_SPEED);
+    stats.recordApproach();
+    return approachAndGrab();
+  }
+
+  /** The remembered jar closest in bearing to {@code headingDeg}, within 20 degrees, or null. */
+  private Vec2 rememberedJarTowards(double headingDeg) {
+    Vec2 here = robot.positionCm();
+    Vec2 best = null;
+    double bestOff = 20;
+    for (Vec2 jar : rememberedJars) {
+      double off = Math.abs(Angles.delta(headingDeg, here.bearingTo(jar)));
+      if (off <= bestOff) {
+        bestOff = off;
+        best = jar;
+      }
+    }
+    return best;
   }
 
   /** Jars currently remembered, nearest first is not guaranteed. */
@@ -239,6 +279,7 @@ final class JarHandler {
    */
   boolean approachAndGrab() {
     Log.info("Approaching jar");
+    blockedAt = null;
     int stepsWithoutJar = 0;
     Vec2 checkpoint = robot.positionCm();
     for (int step = 1; step <= Config.APPROACH_TIMEOUT_STEPS; step++) {
@@ -260,6 +301,10 @@ final class JarHandler {
       }
 
       Vision.Steering steering = Vision.steer(counts);
+      if (steering == Vision.Steering.UNCLEAR && Config.STEER_WHEN_UNCLEAR
+          && counts.total() >= Config.APPROACH_LOST_PIXELS) {
+        steering = Vision.lean(counts);
+      }
       if (steering != Vision.Steering.UNCLEAR) {
         steer(steering, Vision.distanceCm(Vision.lowestGreenRow(image)));
       } else if (pauseToReassess()) {
@@ -269,6 +314,8 @@ final class JarHandler {
       if (step % Config.APPROACH_STALL_WINDOW_STEPS == 0) {
         Vec2 now = robot.positionCm();
         if (now.distanceTo(checkpoint) < Config.APPROACH_STALL_MIN_PROGRESS_CM) {
+          blockedAt = now;
+          blockedHeadingDeg = robot.headingDeg();
           stopApproach("Not making progress (pushing against something); aborting approach");
           return false;
         }
